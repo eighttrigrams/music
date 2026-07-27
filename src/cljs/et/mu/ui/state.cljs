@@ -11,7 +11,6 @@
            :videos []
            :search ""
            :show-login? false    ;; the sign-in form is only asked for
-           :editing nil          ;; the post the edit form is open for
            :open #{}}))          ;; ids of posts whose player is expanded
 
 ;; ---------------------------------------------------------------------------
@@ -74,7 +73,7 @@
 
 (defn logout []
   (clear-token!)
-  (swap! *app-state assoc :logged-in? false :token nil :current-user nil :editing nil))
+  (swap! *app-state assoc :logged-in? false :token nil :current-user nil))
 
 ;; ---------------------------------------------------------------------------
 ;; videos
@@ -93,16 +92,11 @@
 
 (defn add-video
   "`input` is whatever was pasted — a watch URL, a share link, or a bare id. The
-  server resolves it and fetches the title."
+  server resolves the id, keeps any `t=` offset, and fetches the title."
   [input note on-success]
   (api/post-json "/api/videos" {:input input :note (or note "")} (auth-headers)
     (fn [_] (fetch-videos) (when on-success (on-success)))
     (err-handler "Could not post that video")))
-
-(defn update-video [id fields on-success]
-  (api/put-json (str "/api/videos/" id) fields (auth-headers)
-    (fn [_] (fetch-videos) (when on-success (on-success)))
-    (err-handler "Could not save")))
 
 (defn delete-video [id]
   (api/delete-simple (str "/api/videos/" id) (auth-headers)
@@ -111,12 +105,6 @@
 
 ;; ---------------------------------------------------------------------------
 ;; view state
-
-(defn open-edit [video]
-  (swap! *app-state assoc :editing video))
-
-(defn close-edit []
-  (swap! *app-state assoc :editing nil))
 
 (defn toggle-open
   "Expand or collapse a post's embedded player. Several can be open at once."

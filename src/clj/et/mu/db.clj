@@ -54,13 +54,6 @@
     [:= :user_id user-id]
     [:is :user_id nil]))
 
-(defn update-where
-  "WHERE clause for an owned-by-user update, with an optional optimistic-
-  concurrency guard on modified_at (matches only while unchanged)."
-  [id user-id expected-modified-at]
-  (cond-> [:and [:= :id id] (user-id-where-clause user-id)]
-    expected-modified-at (conj [:= :modified_at expected-modified-at])))
-
 (defn build-search-clause
   "Case-insensitive AND-of-terms substring match across `columns`."
   ([search-term] (build-search-clause search-term [:name]))

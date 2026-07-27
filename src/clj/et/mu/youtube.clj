@@ -61,6 +61,27 @@
       input
       (some (fn [re] (second (re-find re input))) video-url-patterns))))
 
+(def ^:private start-param-re
+  "The start offset as YouTube writes it: `?t=`/`&t=` on a watch or share link,
+  `#t=` on older ones, and `start=` on an embed."
+  #"[?&#](?:t|start)=([\dhms]+)")
+
+(def ^:private hms-re #"^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$")
+
+(defn resolve-start-seconds
+  "The start offset in whole seconds from a pasted URL, nil when it names none.
+
+  YouTube writes it two ways: bare seconds (`t=421`, `t=421s`) and a composite
+  (`t=1h2m3s`, `t=7m1s`). Both land here as seconds. Anything unparseable is
+  treated as no offset rather than an error — a link is still worth posting."
+  [input]
+  (when-let [raw (second (re-find start-param-re (str/trim (or input ""))))]
+    (if-let [[_ h m s] (re-matches hms-re raw)]
+      (let [n #(if % (parse-long %) 0)
+            total (+ (* 3600 (n h)) (* 60 (n m)) (n s))]
+        (when (pos? total) total))
+      nil)))
+
 (defn fetch-title
   "The video's title from the oEmbed endpoint, nil when YouTube won't describe it
   (private, deleted, or a bad id)."

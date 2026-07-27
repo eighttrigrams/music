@@ -2,13 +2,22 @@
 
 A one-person feed of YouTube videos. One video per post, plus an optional note.
 
-Reading the feed needs no login — the front page is public. Posting, editing and
-deleting do.
+Every post is public. Reading the feed needs no login; posting and deleting do.
+
+**Posts are immutable.** They can be made and deleted, never edited — so there is
+no `PUT /api/videos/:id` and no edit affordance in the UI.
 
 A post is made by pasting whatever is at hand: a watch URL, a `youtu.be` share
 link, an `/embed/`, `/shorts/` or `/live/` URL, or the bare 11-character id. The
 server resolves the id and asks YouTube's public oEmbed endpoint for the title,
-so a post names itself. Both title and note stay editable afterwards.
+so a post names itself.
+
+Only what identifies the video is kept — the pasted URL is never stored:
+
+- a `t=` **start offset is preserved** (`t=421`, `t=421s`, `t=7m1s`, `t=1h2m3s`,
+  `#t=`, and an embed's `start=` all land as seconds). The card shows it as a
+  `7:01` badge, the embed starts there, and the outbound link carries `&t=421`.
+- share-tracking params like `si=` are **dropped**.
 
 Clicking a post's header expands its player in place, so several can be open at
 once without leaving the page. The search box narrows the feed over title and
@@ -79,7 +88,7 @@ production, 720 in dev. Override with `RATE_LIMIT_MAX_REQUESTS` and
 
 - `src/clj/et/mu` — ring/compojure backend, next.jdbc + honeysql over SQLite,
   ragtime migrations in `resources/migrations/net/et/mu`. `youtube.clj` holds the
-  URL→id resolution and the oEmbed title lookup.
+  URL→id resolution, the `t=` offset parsing and the oEmbed title lookup.
 - `src/cljs/et/mu/ui` — reagent SPA (`core`, `state`, `views/videos`).
 - `resources/public/music` — `index.html`, `styles.css`, `css/` (teal theme in
   `base.css`, app layout in `music.css`, phone rules last in `mobile.css`).

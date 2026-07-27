@@ -78,15 +78,3 @@
   (when (and s (not (str/blank? (str s))))
     (try (Integer/parseInt (str/trim (str s)))
          (catch NumberFormatException _ nil))))
-
-(def conflict-error
-  "This item was changed elsewhere (e.g. another tab). Its current version has been reloaded — review your edit and save again.")
-
-(defn conflict-or-not-found
-  "Response for an optimistic-concurrency update that matched no row. `current`
-  is the freshly-fetched row (nil when it no longer exists): when present the
-  write lost a modified_at race (409 carrying the current row); otherwise 404."
-  [current not-found-msg]
-  (if current
-    {:status 409 :body {:success false :error conflict-error :current current}}
-    {:status 404 :body {:error not-found-msg}}))

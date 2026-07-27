@@ -1,0 +1,2 @@
+{:up ["ALTER TABLE videos ADD COLUMN start_seconds INTEGER"]
+ :down ["ALTER TABLE videos DROP COLUMN start_seconds"]}

@@ -25,8 +25,11 @@
 (defn add-video-handler
   "POST /api/videos — post a video. Takes {:input :note :title}, where `input` is
   a watch URL, a youtu.be link, an /embed/, /shorts/ or /live/ URL, or the bare
-  11-character id. The title is fetched from YouTube unless one is given.
-  400 when the input names no video."
+  11-character id. A `t=` offset on the link is kept as the post's start time;
+  share-tracking params like `si=` are discarded. The title is fetched from
+  YouTube unless one is given. 400 when the input names no video.
+
+  There is no PUT counterpart — a post is immutable once made."
   [req]
   (let [user-id (common/get-user-id req)
         {:keys [input note title]} (:body req)
@@ -38,27 +41,8 @@
                                  {:video-id video-id
                                   :title (or (when-not (str/blank? title) (str/trim title))
                                              (youtube/fetch-title video-id))
-                                  :note (or note "")})})))
-
-(defn update-video-handler
-  "PUT /api/videos/:id — update title and/or note. 409 with the current row when
-  the post was changed elsewhere, 404 when it is gone."
-  [req]
-  (let [user-id (common/get-user-id req)
-        id (common/parse-int-opt (get-in req [:params :id]))
-        {:keys [title note modified_at]} (:body req)
-        fields (cond-> {}
-                 (some? title) (assoc :title (str/trim title))
-                 (some? note) (assoc :note note))]
-    (cond
-      (nil? id) {:status 404 :body {:error "Video not found"}}
-      (empty? fields) {:status 400 :body {:error "nothing to update"}}
-      :else
-      (if-let [result (db.video/update-video (common/ensure-ds) user-id id fields modified_at)]
-        {:status 200 :body result}
-        (common/conflict-or-not-found
-         (db.video/get-video (common/ensure-ds) user-id id)
-         "Video not found")))))
+                                  :note (or note "")
+                                  :start-seconds (youtube/resolve-start-seconds input)})})))
 
 (defn delete-video-handler
   "DELETE /api/videos/:id — remove a post."

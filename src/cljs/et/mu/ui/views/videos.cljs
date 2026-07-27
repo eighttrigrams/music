@@ -2,18 +2,36 @@
   "The feed: one YouTube video per post, newest first.
 
   A card shows the title, the note and when it was posted. Clicking the header
-  expands the embedded player in place, so several posts can play-ready at once
-  without leaving the page. The compose form and the per-card edit/delete
-  affordances only appear once signed in — reading the feed needs no login."
+  expands the embedded player in place, so several posts can sit play-ready at
+  once without leaving the page. A post that was pasted with a `t=` offset starts
+  there — both in the embed and in the outbound link — and shows the offset as a
+  badge.
+
+  Posts are **immutable**: there is no edit affordance anywhere, only Post and
+  Delete. Reading the feed needs no login; the compose form and the Delete button
+  appear once signed in."
   (:require [reagent.core :as r]
             [clojure.string :as str]
             [et.mu.ui.state :as state]))
 
-(defn- embed-url [video-id]
-  (str "https://www.youtube-nocookie.com/embed/" video-id))
+(defn- embed-url [video-id start-seconds]
+  (str "https://www.youtube-nocookie.com/embed/" video-id
+       (when (pos? (or start-seconds 0)) (str "?start=" start-seconds))))
 
-(defn- watch-url [video-id]
-  (str "https://www.youtube.com/watch?v=" video-id))
+(defn- watch-url [video-id start-seconds]
+  (str "https://www.youtube.com/watch?v=" video-id
+       (when (pos? (or start-seconds 0)) (str "&t=" start-seconds))))
+
+(defn- hms
+  "Seconds as `m:ss`, or `h:mm:ss` once it runs past an hour."
+  [total]
+  (let [h (quot total 3600)
+        m (quot (mod total 3600) 60)
+        s (mod total 60)
+        pad #(if (< % 10) (str "0" %) (str %))]
+    (if (pos? h)
+      (str h ":" (pad m) ":" (pad s))
+      (str m ":" (pad s)))))
 
 (defn- day [timestamp]
   (when (seq (str timestamp))
@@ -40,33 +58,19 @@
            :on-change #(reset! note (-> % .-target .-value))}]
          [:button {:on-click submit :disabled (str/blank? @input)} "Post"]]))))
 
-(defn- edit-form [{:keys [id title note modified_at]}]
-  (let [t (r/atom (or title ""))
-        n (r/atom (or note ""))]
-    (fn []
-      [:div.edit-form
-       [:input {:type "text" :placeholder "Title"
-                :value @t
-                :on-change #(reset! t (-> % .-target .-value))}]
-       [:textarea {:rows 3
-                   :value @n
-                   :on-change #(reset! n (-> % .-target .-value))}]
-       [:div.edit-actions
-        [:button {:on-click #(state/update-video id
-                                                 {:title @t :note @n :modified_at modified_at}
-                                                 state/close-edit)} "Save"]
-        [:button.secondary {:on-click state/close-edit} "Cancel"]]])))
-
-(defn- card [{:keys [id video_id title note created_at] :as video} {:keys [logged-in? open editing]}]
-  (let [expanded? (contains? open id)]
+(defn- card [{:keys [id video_id title note start_seconds created_at]} {:keys [logged-in? open]}]
+  (let [expanded? (contains? open id)
+        start (or start_seconds 0)]
     [:div.card
      [:div.card-header {:on-click #(state/toggle-open id)}
       [:span.card-play (if expanded? "▾" "▸")]
       [:h2.card-title (or title video_id)]
+      (when (pos? start)
+        [:span.start-badge {:title "Starts partway in"} (hms start)])
       [:span.card-date (day created_at)]]
      (when expanded?
        [:div.player
-        [:iframe {:src (embed-url video_id)
+        [:iframe {:src (embed-url video_id start)
                   :title (or title video_id)
                   :allow "accelerometer; clipboard-write; encrypted-media; picture-in-picture"
                   :allowFullScreen true
@@ -74,17 +78,14 @@
      (when (seq note)
        [:div.card-note note])
      [:div.card-footer
-      [:a.watch-link {:href (watch-url video_id) :target "_blank" :rel "noreferrer"}
+      [:a.watch-link {:href (watch-url video_id start) :target "_blank" :rel "noreferrer"}
        "Watch on YouTube"]
       (when logged-in?
         [:span.card-actions
-         [:button.secondary {:on-click #(state/open-edit video)} "Edit"]
-         [:button.secondary.danger {:on-click #(state/delete-video id)} "Delete"]])]
-     (when (= id (:id editing))
-       [edit-form editing])]))
+         [:button.secondary.danger {:on-click #(state/delete-video id)} "Delete"]])]]))
 
 (defn videos-tab []
-  (let [{:keys [videos search logged-in? open editing]} @state/*app-state]
+  (let [{:keys [videos search logged-in? open]} @state/*app-state]
     [:div.feed
      (when logged-in? [compose-form])
      [:input.search
@@ -95,4 +96,4 @@
        [:div.empty (if (seq search) "Nothing matches." "No videos yet.")]
        (for [v videos]
          ^{:key (:id v)}
-         [card v {:logged-in? logged-in? :open open :editing editing}]))]))
+         [card v {:logged-in? logged-in? :open open}]))]))

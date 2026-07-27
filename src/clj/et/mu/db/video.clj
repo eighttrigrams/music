@@ -1,10 +1,16 @@
 (ns et.mu.db.video
   "The one entity: a posted video.
 
-  A post is a single YouTube video plus an optional note, newest first. The
-  `video_id` is the 11-character YouTube id, resolved from whatever URL was
-  pasted; the title comes from YouTube's oEmbed endpoint at post time and can be
-  edited afterwards like the note.
+  A post is a single YouTube video plus an optional note, newest first. Only what
+  identifies the video is kept: `video_id` (the 11-character id, resolved from
+  whatever URL was pasted) and `start_seconds` (the `t=` offset, when the link
+  carried one). Share-tracking cruft like `si=` is dropped by construction — the
+  pasted URL itself is never stored. The title comes from YouTube's oEmbed
+  endpoint at post time.
+
+  A post is **immutable**: it can be made and it can be deleted, never edited. So
+  there is no update fn here, and no use for the `modified_at`
+  optimistic-concurrency guard the other plurama apps rely on.
 
   Nothing is unique here on purpose: posting the same video twice is a legitimate
   thing to do, so it is two posts."
@@ -13,16 +19,16 @@
             [taoensso.telemere :as tel]
             [et.mu.db :as db]))
 
-(def select-columns [:id :video_id :title :note :created_at :modified_at])
+(def select-columns [:id :video_id :title :note :start_seconds :created_at])
 
-(defn add-video [ds user-id {:keys [video-id title note]}]
+(defn add-video [ds user-id {:keys [video-id title note start-seconds]}]
   (let [result (jdbc/execute-one! (db/get-conn ds)
                  (sql/format {:insert-into :videos
                               :values [{:video_id video-id
                                         :title title
                                         :note (or note "")
-                                        :user_id user-id
-                                        :modified_at [:raw "datetime('now')"]}]
+                                        :start_seconds start-seconds
+                                        :user_id user-id}]
                               :returning select-columns})
                  db/jdbc-opts)]
     (tel/log! {:level :info :data {:id (:id result) :video-id video-id :user-id user-id}}
@@ -50,18 +56,6 @@
                  :from [:videos]
                  :where [:and [:= :id id] (db/user-id-where-clause user-id)]})
     db/jdbc-opts))
-
-(defn update-video
-  "Set title and/or note. Returns nil when the row is gone or was changed
-  elsewhere (optimistic concurrency on modified_at)."
-  ([ds user-id id fields] (update-video ds user-id id fields nil))
-  ([ds user-id id fields expected-modified-at]
-   (jdbc/execute-one! (db/get-conn ds)
-     (sql/format {:update :videos
-                  :set (assoc fields :modified_at [:raw "datetime('now')"])
-                  :where (db/update-where id user-id expected-modified-at)
-                  :returning select-columns})
-     db/jdbc-opts)))
 
 (defn delete-video [ds user-id id]
   (let [result (jdbc/execute-one! (db/get-conn ds)

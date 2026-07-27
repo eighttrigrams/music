@@ -131,12 +131,12 @@ textarea:focus {
 .card-actions { display: flex; gap: 8px; margin-left: auto; }
 .card-actions button { padding: 6px 12px; font-size: 0.9em; }
 
-.edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-color);
+.start-badge {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 0.75em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.edit-actions { display: flex; gap: 8px; }
