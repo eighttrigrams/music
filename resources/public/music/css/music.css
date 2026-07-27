@@ -7,7 +7,34 @@
 .brand { display: flex; align-items: baseline; gap: 8px; }
 .brand-mark { color: var(--accent); font-size: 1.4em; }
 .brand-name { font-size: 1.4em; font-weight: 600; letter-spacing: -0.02em; }
-.top-bar button { margin-left: auto; }
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Mirrors tracker's toggle: a bare glyph, ☾ to go dark and ☀ to come back. */
+.dark-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease, color 2s ease;
+}
+.dark-mode-toggle:hover {
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  transform: none;
+}
 
 button.secondary {
   background: var(--glass-bg);
@@ -48,7 +75,7 @@ button:disabled { opacity: 0.45; cursor: default; transform: none; }
 
 textarea {
   padding: 10px 14px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--input-border);
   border-radius: 10px;
   background: var(--glass-bg-subtle);
   font-family: inherit;

@@ -23,6 +23,11 @@ Clicking a post's header expands its player in place, so several can be open at
 once without leaving the page. The search box narrows the feed over title and
 note.
 
+The ☾/☀ button switches between light and dark. As in tracker, the palette lives
+entirely in `css/base.css` keyed on `html.dark-mode`, and the button only adds or
+removes that class. The choice is remembered in `localStorage`; on a first visit
+it follows the operating system.
+
 ## Hosting
 
 Runs standalone in dev, and in production inside the [plurama](../plurama)

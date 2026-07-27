@@ -6,18 +6,17 @@
 
 (defn list-videos-handler
   "GET /api/videos — the posted videos, newest first, optionally filtered by
-  ?search over title and note."
+  ?search over title and note. Public: the same feed whether or not you are
+  signed in."
   [req]
-  (let [user-id (common/get-user-id req)
-        search (get-in req [:query-params "search"])]
-    {:status 200 :body (db.video/list-videos (common/ensure-ds) user-id {:search-term search})}))
+  (let [search (get-in req [:query-params "search"])]
+    {:status 200 :body (db.video/list-videos (common/ensure-ds) {:search-term search})}))
 
 (defn get-video-handler
-  "GET /api/videos/:id — a single post."
+  "GET /api/videos/:id — a single post. Public, like the listing."
   [req]
-  (let [user-id (common/get-user-id req)
-        id (common/parse-int-opt (get-in req [:params :id]))
-        video (when id (db.video/get-video (common/ensure-ds) user-id id))]
+  (let [id (common/parse-int-opt (get-in req [:params :id]))
+        video (when id (db.video/get-video (common/ensure-ds) id))]
     (if video
       {:status 200 :body video}
       {:status 404 :body {:error "Video not found"}})))

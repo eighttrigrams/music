@@ -2,6 +2,18 @@
   (:require [reagent.core :as r]
             [et.mu.ui.api :as api]))
 
+(defn- os-prefers-dark? []
+  (.-matches (js/window.matchMedia "(prefers-color-scheme: dark)")))
+
+(defn- initial-dark-mode
+  "A remembered choice wins; failing that, follow the OS. base.css keys its dark
+  palette on `html.dark-mode`, so this only decides whether that class is on."
+  []
+  (case (.getItem js/localStorage "music-dark-mode")
+    "true" true
+    "false" false
+    (os-prefers-dark?)))
+
 (defonce *app-state
   (r/atom {:auth-required? nil   ;; nil = still loading
            :logged-in? false
@@ -11,6 +23,7 @@
            :videos []
            :search ""
            :show-login? false    ;; the sign-in form is only asked for
+           :dark-mode (initial-dark-mode)
            :open #{}}))          ;; ids of posts whose player is expanded
 
 ;; ---------------------------------------------------------------------------
@@ -110,3 +123,30 @@
   "Expand or collapse a post's embedded player. Several can be open at once."
   [id]
   (swap! *app-state update :open #(if (contains? % id) (disj % id) (conj % id))))
+
+;; ---------------------------------------------------------------------------
+;; dark mode
+;;
+;; Same mechanism as tracker: the palette lives entirely in CSS, keyed on
+;; `html.dark-mode`, and all this does is put that class on or off the root
+;; element. The light `:root` values are never touched. Unlike tracker's, the
+;; choice is remembered, so a reload does not snap back.
+
+(defn- apply-dark-mode! [dark?]
+  (let [classes (.-classList (.-documentElement js/document))]
+    (if dark?
+      (.add classes "dark-mode")
+      (.remove classes "dark-mode"))))
+
+(defn toggle-dark-mode []
+  (swap! *app-state update :dark-mode not))
+
+(defn setup-dark-mode!
+  "Apply the starting choice, then keep the root class in step with the atom."
+  []
+  (apply-dark-mode! (:dark-mode @*app-state))
+  (add-watch *app-state :dark-mode-sync
+    (fn [_ _ old-state new-state]
+      (when (not= (:dark-mode old-state) (:dark-mode new-state))
+        (apply-dark-mode! (:dark-mode new-state))
+        (.setItem js/localStorage "music-dark-mode" (str (:dark-mode new-state)))))))

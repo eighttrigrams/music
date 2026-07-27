@@ -35,26 +35,34 @@
               "Video posted")
     result))
 
+;; Reads are deliberately NOT scoped by user_id. Every post is public and there
+;; is one poster, so the feed is the same for everyone — an anonymous visitor
+;; must see exactly what the signed-in owner sees. Scoping reads was the bug that
+;; made the live feed look empty when logged out: an anonymous request has no
+;; user-id, which `user-id-where-clause` renders as `user_id IS NULL`, matching
+;; none of the owner's rows. `user_id` is still recorded on insert and still
+;; gates deletes.
+
 (defn list-videos
   "Newest post first, optionally narrowed by a substring search over title and
-  note."
-  ([ds user-id] (list-videos ds user-id {}))
-  ([ds user-id {:keys [search-term]}]
-   (let [search-clause (db/build-search-clause search-term [:title :note])
-         where-clause (into [:and (db/user-id-where-clause user-id)]
-                            (filter some? [search-clause]))]
+  note. Public: returns every post regardless of who is asking."
+  ([ds] (list-videos ds {}))
+  ([ds {:keys [search-term]}]
+   (let [search-clause (db/build-search-clause search-term [:title :note])]
      (jdbc/execute! (db/get-conn ds)
-       (sql/format {:select select-columns
-                    :from [:videos]
-                    :where where-clause
-                    :order-by [[:created_at :desc] [:id :desc]]})
+       (sql/format (cond-> {:select select-columns
+                            :from [:videos]
+                            :order-by [[:created_at :desc] [:id :desc]]}
+                     search-clause (assoc :where search-clause)))
        db/jdbc-opts))))
 
-(defn get-video [ds user-id id]
+(defn get-video
+  "One post by id. Public, like the listing."
+  [ds id]
   (jdbc/execute-one! (db/get-conn ds)
     (sql/format {:select select-columns
                  :from [:videos]
-                 :where [:and [:= :id id] (db/user-id-where-clause user-id)]})
+                 :where [:= :id id]})
     db/jdbc-opts))
 
 (defn delete-video [ds user-id id]

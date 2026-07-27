@@ -22,17 +22,22 @@
          [:button {:on-click do-login} "Sign in"]]))))
 
 (defn- top-bar []
-  (let [{:keys [auth-required? logged-in? show-login?]} @state/*app-state]
+  (let [{:keys [auth-required? logged-in? show-login? dark-mode]} @state/*app-state]
     [:div.top-bar
      [:div.brand
       [:span.brand-mark "♫"]
       [:span.brand-name "Music"]]
-     (cond
-       (not auth-required?) nil
-       logged-in? [:button.secondary {:on-click state/logout} "Sign out"]
-       show-login? nil
-       :else [:button.secondary
-              {:on-click #(swap! state/*app-state assoc :show-login? true)} "Sign in"])]))
+     [:div.top-bar-right
+      [:button.dark-mode-toggle
+       {:on-click state/toggle-dark-mode
+        :title (if dark-mode "Switch to light" "Switch to dark")}
+       (if dark-mode "☀" "☾")]
+      (cond
+        (not auth-required?) nil
+        logged-in? [:button.secondary {:on-click state/logout} "Sign out"]
+        show-login? nil
+        :else [:button.secondary
+               {:on-click #(swap! state/*app-state assoc :show-login? true)} "Sign in"])]]))
 
 (defn app []
   (let [{:keys [auth-required? logged-in? show-login? error]} @state/*app-state]
@@ -50,5 +55,6 @@
 (defonce root (rdomc/create-root (.getElementById js/document "app")))
 
 (defn init []
+  (state/setup-dark-mode!)
   (state/fetch-auth-required)
   (rdomc/render root [app]))
