@@ -1,0 +1,21 @@
+{:up ["CREATE TABLE users (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         username TEXT NOT NULL UNIQUE,
+         password_hash TEXT NOT NULL,
+         created_at DATETIME DEFAULT (datetime('now'))
+       )"
+      "CREATE TABLE videos (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         video_id TEXT NOT NULL,
+         title TEXT,
+         note TEXT DEFAULT '',
+         created_at DATETIME DEFAULT (datetime('now')),
+         modified_at DATETIME DEFAULT (datetime('now')),
+         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+       )"
+      "CREATE INDEX idx_videos_user ON videos (user_id)"
+      "CREATE INDEX idx_videos_created ON videos (created_at)"]
+ :down ["DROP INDEX IF EXISTS idx_videos_created"
+        "DROP INDEX IF EXISTS idx_videos_user"
+        "DROP TABLE IF EXISTS videos"
+        "DROP TABLE IF EXISTS users"]}

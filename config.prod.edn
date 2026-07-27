@@ -1,0 +1,4 @@
+{:db {:type :sqlite-file
+      :path "/app/data/music.db"}
+ :port #long #or [#env PORT 8080]
+ :logfile "logs/music.log"}
