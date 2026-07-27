@@ -7,7 +7,7 @@ if [ ! -f config.edn ]; then
 {:db {:type :sqlite-file
       :path "data/music.db"}
  :port #long #or [#env PORT 3160]
- :nrepl-port 7899
+ :nrepl-port 7900
  :dangerously-skip-logins? true}
 EOF
 fi

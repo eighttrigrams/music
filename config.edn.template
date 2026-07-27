@@ -1,6 +1,6 @@
 {:db {:type :sqlite-memory}
  :port #long #or [#env PORT 3160]
- :nrepl-port 7899
+ :nrepl-port 7900
  :dangerously-skip-logins? true
  :shadow? true
  :logfile "logs/music.log"}
