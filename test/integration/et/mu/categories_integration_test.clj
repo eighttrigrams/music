@@ -92,6 +92,17 @@
       (is (= 404 (:status (PUT-json "/api/videos/9999"
                                     {:description "x" :entity-ids []})))))))
 
+(deftest put-drops-entity-ids-that-name-nothing
+  (let [category (category! "artist")
+        entity (entity! (:id category) "Roland")
+        video (post! "Phantom")
+        response (PUT-json (str "/api/videos/" (:id video))
+                           {:description "" :entity-ids [(:id entity) 4242]})]
+    (is (= 200 (:status response)))
+    (is (= ["Roland"] (map :name (:entities (:body response)))))
+    (testing "the phantom row never landed, so it cannot answer a filter either"
+      (is (= [] (:body (GET-json "/api/videos?entities=4242")))))))
+
 (deftest put-is-scoped-by-user
   (let [video (post! "Mine")
         stolen (API :put (str "/api/videos/" (:id video))

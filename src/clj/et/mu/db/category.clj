@@ -11,7 +11,8 @@
   category. The add fns answer nil rather than throwing when a name is taken.
 
   Foreign keys are not enforced on this connection, so ON DELETE CASCADE would be
-  a promise nothing keeps: every delete fn clears the join rows it orphans."
+  a promise nothing keeps: every delete fn clears the join rows it orphans, and a
+  write only ever assigns entities that exist."
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [taoensso.telemere :as tel]
@@ -116,13 +117,27 @@
   (jdbc/execute-one! (db/get-conn ds)
     (sql/format {:delete-from :video_entities :where [:= :video_id video-id]})))
 
+(defn- existing-entity-ids
+  "Which of `ids` name an entity that is actually there. One query: the schema
+  keeps its own referential integrity because SQLite will not, and that obligation
+  is the writer's too — a join row for an id nobody can see would still answer a
+  filter for it."
+  [conn ids]
+  (into #{}
+        (map :id)
+        (jdbc/execute! conn
+          (sql/format {:select [:id] :from [:entities] :where [:in :id ids]})
+          db/jdbc-opts)))
+
 (defn set-video-entities
   "Replace a post's assignments wholesale. Set semantics: repeats collapse, and
-  anything that is not an id is ignored."
+  anything that is not the id of an entity that exists is ignored."
   [ds video-id entity-ids]
   (let [conn (db/get-conn ds)
-        ids (distinct (filter int? entity-ids))]
-    (clear-video-entities conn video-id)
+        candidates (vec (distinct (filterv int? entity-ids)))
+        ids (when (seq candidates)
+              (filterv (existing-entity-ids conn candidates) candidates))]
+    (clear-video-entities ds video-id)
     (when (seq ids)
       (jdbc/execute-one! conn
         (sql/format {:insert-into :video_entities

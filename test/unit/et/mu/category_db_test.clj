@@ -98,3 +98,19 @@
         video (:id (post! "Repeats"))]
     (db.category/set-video-entities *ds* video [entity entity entity nil "nope"])
     (is (= [{:video_id video :entity_id entity}] (join-rows)))))
+
+(deftest an-id-no-entity-has-is-not-assigned
+  (let [category (:id (db.category/add-category *ds* "artist"))
+        entity (:id (db.category/add-entity *ds* category "Roland"))
+        gone (:id (db.category/add-entity *ds* category "Yamaha"))
+        video (:id (post! "Phantoms"))]
+    (db.category/delete-entity *ds* gone)
+    (db.category/set-video-entities *ds* video [entity gone 4242])
+    (is (= [{:video_id video :entity_id entity}] (join-rows)))
+    (is (= ["Roland"] (map :name (entities-of video))))
+    (testing "so nothing is left for a filter on the phantom to match"
+      (is (empty? (db.video/list-videos *ds* {:authed? true :entity-ids [4242]})))
+      (is (empty? (db.video/list-videos *ds* {:authed? true :entity-ids [gone]}))))
+    (testing "and an id-only write clears what was there"
+      (db.category/set-video-entities *ds* video [4242])
+      (is (= [] (join-rows))))))
