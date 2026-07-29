@@ -43,18 +43,22 @@ as a private aside and the entities as chips. A filter menu on the right of the
 search box narrows the feed to the posts assigned to *any* of the checked
 entities, and the text search then applies within that subset.
 
-All of it belongs to the signed-in owner. **An anonymous visitor sees the feed
-exactly as before** — no descriptions, no chips, no filter menu, no Categories
-page.
+The line between public and private runs *through* this layer, not around it. The
+**vocabulary and the filtering are part of the public feed**: anyone may read the
+categories and narrow the feed by an entity, filter menu, count badge and all.
+The **annotation on a post** stays the owner's: an anonymous visitor gets no
+descriptions and no chips, and no Categories page or Edit button to make them
+with. So a visitor can narrow the feed to an entity and still not be told which
+posts carry it. That asymmetry is the intended design.
 
-That is enforced by the server, not by the client: an anonymous
+The private half is enforced by the server, not by the client: an anonymous
 `GET /api/videos` response simply does not carry the `description` or `entities`
-keys, so there is nothing for the UI to hide. `GET /api/categories` and the
-`entities=` filter answer `401` to an anonymous caller. "Authenticated" here means
-a valid Bearer token or dev skip-logins — note `wrap-auth` only gates *mutating*
-requests, so read visibility is decided in the handler and db layers. A machine
-token (`:machine? true`) verifies like any other and therefore sees everything,
-which is intended.
+keys — filtered or not — so there is nothing for the UI to hide.
+`GET /api/categories` and the `entities=` filter answer anybody; the writes are
+what stay gated. "Authenticated" here means a valid Bearer token or dev
+skip-logins — note `wrap-auth` only gates *mutating* requests, so read visibility
+is decided in the handler and db layers. A machine token (`:machine? true`)
+verifies like any other and therefore sees everything, which is intended.
 
 ## Hosting
 
@@ -102,9 +106,9 @@ Beyond the feed's `GET`/`POST`/`DELETE /api/videos`, the annotation layer adds:
 - `PUT /api/videos/:id` — `{:description :entity-ids}`, both replaced wholesale.
   Nothing else about the post can be written.
 - `GET /api/videos?entities=1,2,5` — restrict to posts assigned to any of them,
-  ANDed with `?search`. Owner-only.
+  ANDed with `?search`. Public.
 - `GET /api/categories` — categories with their entities nested, both
-  alphabetical. Owner-only.
+  alphabetical. Public; the writes below are not.
 - `POST /api/categories` `{:name}`, `DELETE /api/categories/:id`
 - `POST /api/categories/:id/entities` `{:name}`, `DELETE /api/entities/:id`
 
