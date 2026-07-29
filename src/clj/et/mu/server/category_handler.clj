@@ -4,12 +4,11 @@
             [et.mu.db.category :as db.category]))
 
 (defn list-categories-handler
-  "GET /api/categories — the owner's categories, each with its entities nested,
-  both alphabetical. Owner-only: 401 for an anonymous request."
-  [req]
-  (if (common/authenticated? req)
-    {:status 200 :body (db.category/list-categories (common/ensure-ds))}
-    common/unauthorized))
+  "GET /api/categories — the categories, each with its entities nested, both
+  alphabetical. Public: the vocabulary is what the feed's filter is made of, and
+  anyone may filter. Making and unmaking it is still the owner's."
+  [_req]
+  {:status 200 :body (db.category/list-categories (common/ensure-ds))})
 
 (defn- posted-name
   "The name a request offers, or nil when it offered no string. JSON can hand over

@@ -17,20 +17,18 @@
 (defn list-videos-handler
   "GET /api/videos — the posted videos, newest first, optionally filtered by
   ?search over title and note and by ?entities=1,2,5 (posts assigned to any of
-  them, ANDed with the search). Public: the same feed whether or not you are
-  signed in, except that an authenticated response also carries each post's
-  :description and :entities. ?entities is part of that owner-only layer, so an
-  anonymous request using it gets 401."
+  them, ANDed with the search). Public, the filter included: the same feed whether
+  or not you are signed in, except that an authenticated response also carries
+  each post's :description and :entities. So a visitor may narrow the feed by an
+  entity yet still not be told which posts carry it."
   [req]
-  (let [authed? (common/authenticated? req)
-        entities-param (common/query-param req "entities")]
-    (if (and (some? entities-param) (not authed?))
-      common/unauthorized
-      {:status 200
-       :body (db.video/list-videos (common/ensure-ds)
-                                   {:search-term (common/query-param req "search")
-                                    :entity-ids (parse-entity-ids entities-param)
-                                    :authed? authed?})})))
+  (let [authed? (common/authenticated? req)]
+    {:status 200
+     :body (db.video/list-videos (common/ensure-ds)
+                                 {:search-term (common/query-param req "search")
+                                  :entity-ids (parse-entity-ids
+                                               (common/query-param req "entities"))
+                                  :authed? authed?})}))
 
 (defn get-video-handler
   "GET /api/videos/:id — a single post. Public, like the listing, and like the

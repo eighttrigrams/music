@@ -2,8 +2,11 @@
   "The owner's annotation vocabulary, and the join that hangs it off a post.
 
   A category (\"artist\", \"manufacturer\") holds entities (\"Caroline Polachek\",
-  \"Roland\"); `video_entities` assigns any number of entities to a post. None of
-  this is public — it exists for the signed-in owner alone, which is why the
+  \"Roland\"); `video_entities` assigns any number of entities to a post. The
+  vocabulary itself is public — anyone may read it and filter the feed by it, only
+  the writing is the owner's. Which posts a given entity is assigned to is
+  readable through `video-filter-clause`, but *which entities a given post
+  carries* is not: `entities-by-video` feeds the owner-only annotation layer. That
   visibility decision lives one layer up, in the handlers and in
   `et.mu.db.video`.
 

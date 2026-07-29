@@ -68,13 +68,11 @@
 
 ;; `wrap-auth` only gates mutating requests, so a read has to decide for itself
 ;; whether anybody is signed in — a valid Bearer token or dev skip-logins counts
-;; as the owner, anybody else is an anonymous visitor. The whole annotation layer
-;; is owner-only.
+;; as the owner, anybody else is an anonymous visitor. What that decides is the
+;; annotation layer on a post: the vocabulary and the filter built from it are
+;; public, the :description and :entities carried beside a post are not.
 (defn authenticated? [req]
   (some? (get-user-from-request req)))
-
-(def unauthorized
-  {:status 401 :body {:error "Authentication required"}})
 
 (defn admin-password []
   (or (System/getenv "ADMIN_PASSWORD")

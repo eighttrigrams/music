@@ -1,7 +1,10 @@
 (ns et.mu.visibility-integration-test
-  "The annotation layer is the owner's. The server is what enforces that: an
+  "Where the line runs. The vocabulary and the filter made of it are public —
+  anyone may read the categories and narrow the feed by an entity. The annotation
+  layer *on a post* is the owner's, and the server is what enforces that: an
   anonymous response must not contain the data at all, so there is nothing a
-  client could be trusted (or fail) to hide."
+  client could be trusted (or fail) to hide. Hence the deliberate asymmetry — a
+  visitor can filter by an entity yet is never told which posts carry it."
   (:require [clojure.test :refer [deftest testing is use-fixtures]]
             [et.mu.auth :as auth]
             [et.mu.db.category :as db.category]
@@ -14,11 +17,12 @@
 (defn- seed! []
   (let [category (db.category/add-category *ds* "artist")
         entity (db.category/add-entity *ds* (:id category) "Caroline Polachek")
+        unassigned (db.category/add-entity *ds* (:id category) "Sufjan Stevens")
         video (db.video/add-video *ds* *user-id* {:video-id "dQw4w9WgXcQ" :title "Bunny Is a Rider"
                                                  :note "public note" :start-seconds nil})]
     (db.video/update-video *ds* *user-id* (:id video)
                            {:description "private description" :entity-ids [(:id entity)]})
-    {:entity-id (:id entity) :video-id (:id video)}))
+    {:entity-id (:id entity) :unassigned-id (:id unassigned) :video-id (:id video)}))
 
 (deftest anonymous-responses-carry-no-annotation-layer
   (with-real-auth
@@ -51,22 +55,37 @@
           listed (API :get "/api/videos" {:token token})]
       (is (= "private description" (:description (first (:body listed))))))))
 
-(deftest categories-are-owner-only
+(deftest the-vocabulary-is-public
   (with-real-auth
     (seed!)
-    (is (= 401 (:status (API :get "/api/categories" {:anonymous? true}))))
-    (is (= 200 (:status (API :get "/api/categories" {:token (token-for *user-id*)}))))))
+    (let [listed (API :get "/api/categories" {:anonymous? true})]
+      (is (= 200 (:status listed)))
+      (is (= ["artist"] (map :name (:body listed))))
+      (is (= ["Caroline Polachek" "Sufjan Stevens"]
+             (mapcat #(map :name (:entities %)) (:body listed)))
+          "with its entities nested, or there would be nothing to check in the filter")
+      (is (= (:body listed) (:body (API :get "/api/categories" {:token (token-for *user-id*)})))
+          "the same vocabulary either way"))))
 
-(deftest the-entity-filter-is-owner-only
+(deftest the-entity-filter-is-public
   (with-real-auth
-    (let [{:keys [entity-id]} (seed!)]
-      (is (= 401 (:status (API :get (str "/api/videos?entities=" entity-id) {:anonymous? true}))))
-      (is (= 401 (:status (API :get "/api/videos?entities=" {:anonymous? true})))
-          "the param is the owner-only capability, empty or not")
-      (is (= 200 (:status (API :get (str "/api/videos?entities=" entity-id)
-                               {:token (token-for *user-id*)}))))
-      (testing "a plain search stays public"
-        (is (= 200 (:status (API :get "/api/videos?search=bunny" {:anonymous? true}))))))))
+    (let [{:keys [entity-id unassigned-id]} (seed!)
+          filter-by (fn [query] (API :get (str "/api/videos" query) {:anonymous? true}))
+          filtered (filter-by (str "?entities=" entity-id))]
+      (is (= 200 (:status filtered)))
+      (is (= ["Bunny Is a Rider"] (map :title (:body filtered))))
+      (testing "an entity nothing is assigned to narrows to nothing"
+        (is (= [] (:body (filter-by (str "?entities=" unassigned-id))))))
+      (testing "an empty param is no filter, as for the owner"
+        (is (= 1 (count (:body (filter-by "?entities="))))))
+      (testing "ANDed with the search, as for the owner"
+        (is (= ["Bunny Is a Rider"]
+               (map :title (:body (filter-by (str "?entities=" entity-id "&search=bunny"))))))
+        (is (= [] (:body (filter-by (str "?entities=" entity-id "&search=chicago"))))))
+      (testing "and what the filter hands back still carries no annotation layer"
+        (let [video (first (:body filtered))]
+          (is (not (contains? video :description)))
+          (is (not (contains? video :entities))))))))
 
 (deftest the-mutating-category-routes-are-gated-by-wrap-auth
   (with-prod-app
@@ -81,6 +100,8 @@
       (is (= "artist" (:name (:body created)))))))
 
 (deftest dev-skip-logins-counts-as-the-owner
-  (seed!)
-  (is (= "private description" (:description (first (:body (API :get "/api/videos" {}))))))
-  (is (= 200 (:status (API :get "/api/categories" {})))))
+  (let [{:keys [video-id]} (seed!)]
+    (testing "no token anywhere, yet the responses come back in the owner's shape"
+      (is (= "private description" (:description (first (:body (API :get "/api/videos" {}))))))
+      (is (= ["Caroline Polachek"]
+             (map :name (:entities (:body (API :get (str "/api/videos/" video-id) {})))))))))
