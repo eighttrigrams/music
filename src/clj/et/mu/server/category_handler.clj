@@ -3,21 +3,13 @@
             [et.mu.server.common :as common]
             [et.mu.db.category :as db.category]))
 
-;; `wrap-auth` only gates mutating requests, so a read has to decide for itself
-;; whether anybody is signed in. The whole annotation layer is owner-only.
-(defn- authenticated? [req]
-  (some? (common/get-user-from-request req)))
-
-(def ^:private unauthorized
-  {:status 401 :body {:error "Authentication required"}})
-
 (defn list-categories-handler
   "GET /api/categories — the owner's categories, each with its entities nested,
   both alphabetical. Owner-only: 401 for an anonymous request."
   [req]
-  (if (authenticated? req)
+  (if (common/authenticated? req)
     {:status 200 :body (db.category/list-categories (common/ensure-ds))}
-    unauthorized))
+    common/unauthorized))
 
 (defn add-category-handler
   "POST /api/categories — create a category from {:name}. 400 on a blank name or

@@ -57,6 +57,18 @@
       (is (= 4 (count (titles "?entities="))))
       (is (= 4 (count (titles "?entities=zzz")))))))
 
+(deftest a-repeated-query-param-collapses-to-its-last-value
+  (let [{:keys [polachek stevens]} (fixture)]
+    (testing "wrap-params hands a repeated param over as a vector, not a string"
+      (is (= #{"Chicago" "A collaboration"}
+             (titles (str "?entities=" polachek "&entities=" stevens)))))
+    (testing "the pre-existing search param the same way"
+      (is (= #{"A collaboration"} (titles "?search=chicago&search=collaboration"))))
+    (testing "both at once"
+      (is (= #{"A collaboration"}
+             (titles (str "?entities=" polachek "&entities=" polachek "," stevens
+                          "&search=both&search=collaboration")))))))
+
 (deftest an-unassigned-post-is-reachable-only-without-a-filter
   (let [{:keys [polachek stevens]} (fixture)]
     (is (contains? (titles "") "Unassigned"))

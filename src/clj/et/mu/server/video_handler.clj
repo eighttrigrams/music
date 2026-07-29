@@ -4,15 +4,6 @@
             [et.mu.db.video :as db.video]
             [et.mu.youtube :as youtube]))
 
-;; `wrap-auth` only gates mutating requests, so these reads decide the
-;; annotation layer's visibility themselves — a valid Bearer token or dev
-;; skip-logins counts as the owner, anybody else is an anonymous visitor.
-(defn- authenticated? [req]
-  (some? (common/get-user-from-request req)))
-
-(def ^:private unauthorized
-  {:status 401 :body {:error "Authentication required"}})
-
 (defn- parse-entity-ids
   "`1,2,5`. Tokens that are not ids are ignored, so an effectively empty param
   narrows nothing."
@@ -31,13 +22,13 @@
   :description and :entities. ?entities is part of that owner-only layer, so an
   anonymous request using it gets 401."
   [req]
-  (let [authed? (authenticated? req)
-        entities-param (get-in req [:query-params "entities"])]
+  (let [authed? (common/authenticated? req)
+        entities-param (common/query-param req "entities")]
     (if (and (some? entities-param) (not authed?))
-      unauthorized
+      common/unauthorized
       {:status 200
        :body (db.video/list-videos (common/ensure-ds)
-                                   {:search-term (get-in req [:query-params "search"])
+                                   {:search-term (common/query-param req "search")
                                     :entity-ids (parse-entity-ids entities-param)
                                     :authed? authed?})})))
 
@@ -47,7 +38,7 @@
   [req]
   (let [id (common/parse-int-opt (get-in req [:params :id]))
         video (when id (db.video/get-video (common/ensure-ds) id
-                                           {:authed? (authenticated? req)}))]
+                                           {:authed? (common/authenticated? req)}))]
     (if video
       {:status 200 :body video}
       {:status 404 :body {:error "Video not found"}})))

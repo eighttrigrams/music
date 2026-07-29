@@ -66,6 +66,16 @@
 (defn get-user-id [req]
   (:user-id (get-user-from-request req)))
 
+;; `wrap-auth` only gates mutating requests, so a read has to decide for itself
+;; whether anybody is signed in — a valid Bearer token or dev skip-logins counts
+;; as the owner, anybody else is an anonymous visitor. The whole annotation layer
+;; is owner-only.
+(defn authenticated? [req]
+  (some? (get-user-from-request req)))
+
+(def unauthorized
+  {:status 401 :body {:error "Authentication required"}})
+
 (defn admin-password []
   (or (System/getenv "ADMIN_PASSWORD")
       (when (= "true" (System/getenv "DEV")) "admin")
@@ -73,6 +83,14 @@
 
 (defn is-admin? [req]
   (:is-admin (get-user-from-request req)))
+
+(defn query-param
+  "One query param's value. A repeated param (`?a=1&a=2`) reaches us from
+  wrap-params as a vector of every value it was given; the last one wins, so a
+  caller always gets a plain string or nil."
+  [req name]
+  (let [value (get-in req [:query-params name])]
+    (if (sequential? value) (last value) value)))
 
 (defn parse-int-opt [s]
   (when (and s (not (str/blank? (str s))))
