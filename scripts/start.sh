@@ -12,6 +12,12 @@ if [ ! -f config.edn ]; then
 EOF
 fi
 
+# sqlite creates the file but not the directory holding it, and a fresh checkout
+# has no data/ — without this the first start dies on "no such table:
+# ragtime_migrations".
+db_path=$(sed -n 's/.*:path *"\([^"]*\)".*/\1/p' config.edn | head -1)
+mkdir -p "$(dirname "${db_path:-data/music.db}")"
+
 # Mark which environment owns the dev server so stop.sh refuses a cross-env
 # stop (host vs container port-forward proxy). See tracker's scripts for the
 # full rationale.
