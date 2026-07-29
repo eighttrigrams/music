@@ -1,5 +1,5 @@
 (ns et.mu.ui.api
-  (:require [ajax.core :refer [GET POST DELETE]]))
+  (:require [ajax.core :refer [GET POST PUT DELETE]]))
 
 (defn fetch-json
   [endpoint headers handler]
@@ -14,6 +14,19 @@
    (post-json endpoint params headers handler nil))
   ([endpoint params headers handler error-handler]
    (POST endpoint
+     (cond-> {:params params
+              :format :json
+              :response-format :json
+              :keywords? true
+              :headers headers
+              :handler handler}
+       error-handler (assoc :error-handler error-handler)))))
+
+(defn put-json
+  ([endpoint params headers handler]
+   (put-json endpoint params headers handler nil))
+  ([endpoint params headers handler error-handler]
+   (PUT endpoint
      (cond-> {:params params
               :format :json
               :response-format :json

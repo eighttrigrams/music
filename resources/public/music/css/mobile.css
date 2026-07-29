@@ -9,9 +9,21 @@
   .card-actions { margin-left: 0; }
   .login-form { max-width: none; flex-wrap: wrap; }
   .login-form input { flex: 1 1 100%; }
+  .top-bar-right { flex-wrap: wrap; }
+  .card-description { flex-wrap: wrap; gap: 4px 10px; }
+  .filter-panel { width: min(84vw, 300px); }
+  .modal-backdrop { padding: 12px; align-items: flex-start; }
+  .modal { margin-top: 12px; }
+  .category { padding: 14px; }
+  .add-category { flex-wrap: wrap; }
+  .add-category input, .add-entity input { max-width: none; }
 }
 
 /* Touch screens: the lift-on-hover reads as a stuck state after a tap. */
 @media (hover: none) {
   .card:hover { transform: none; box-shadow: var(--glass-shadow); }
+  /* No pointer to hover with, so the filter panel is click-toggled only —
+     otherwise a tap opens it and the same tap's click closes it again. */
+  .filter-menu:hover .filter-panel { display: none; }
+  .filter-menu.pinned .filter-panel { display: block; }
 }

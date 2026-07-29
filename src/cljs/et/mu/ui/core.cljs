@@ -2,7 +2,8 @@
   (:require [reagent.dom.client :as rdomc]
             [reagent.core :as r]
             [et.mu.ui.state :as state]
-            [et.mu.ui.views.videos :as videos]))
+            [et.mu.ui.views.videos :as videos]
+            [et.mu.ui.views.categories :as categories]))
 
 (defn login-form []
   (let [username (r/atom "")
@@ -21,13 +22,24 @@
                   :on-key-down #(when (= (.-key %) "Enter") (do-login))}]
          [:button {:on-click do-login} "Sign in"]]))))
 
+(defn- page-nav
+  "No router: the page is a key in app-state. Only the owner has a second page to
+  go to, so this shows up only when signed in."
+  [page]
+  [:div.page-nav
+   [:button.page-link {:class (when (= page :feed) "active")
+                       :on-click #(state/set-page :feed)} "Feed"]
+   [:button.page-link {:class (when (= page :categories) "active")
+                       :on-click #(state/set-page :categories)} "Categories"]])
+
 (defn- top-bar []
-  (let [{:keys [auth-required? logged-in? show-login? dark-mode]} @state/*app-state]
+  (let [{:keys [auth-required? logged-in? show-login? dark-mode page]} @state/*app-state]
     [:div.top-bar
      [:div.brand
       [:span.brand-mark "♫"]
       [:span.brand-name "Music"]]
      [:div.top-bar-right
+      (when logged-in? [page-nav page])
       [:button.dark-mode-toggle
        {:on-click state/toggle-dark-mode
         :title (if dark-mode "Switch to light" "Switch to dark")}
@@ -40,7 +52,7 @@
                {:on-click #(swap! state/*app-state assoc :show-login? true)} "Sign in"])]]))
 
 (defn app []
-  (let [{:keys [auth-required? logged-in? show-login? error]} @state/*app-state]
+  (let [{:keys [auth-required? logged-in? show-login? error page]} @state/*app-state]
     (if (nil? auth-required?)
       [:div.loading "Loading…"]
       [:div
@@ -50,7 +62,9 @@
        (when (and auth-required? (not logged-in?) show-login?)
          [login-form])
        [:div.main-layout
-        [videos/videos-tab]]])))
+        (if (and logged-in? (= page :categories))
+          [categories/categories-tab]
+          [videos/videos-tab])]])))
 
 (defonce root (rdomc/create-root (.getElementById js/document "app")))
 

@@ -7,9 +7,11 @@
   there — both in the embed and in the outbound link — and shows the offset as a
   badge.
 
-  Posts are **immutable**: there is no edit affordance anywhere, only Post and
-  Delete. Reading the feed needs no login; the compose form and the Delete button
-  appear once signed in."
+  The **post is immutable**: title, video and note can be posted and deleted,
+  never edited. What Edit reaches is the annotation layer beside it — the owner's
+  private description and the entities the post is assigned to. That layer, the
+  filter menu and Delete all appear only once signed in; an anonymous visitor is
+  never sent the data behind them, so there is nothing here that hides it."
   (:require [reagent.core :as r]
             [clojure.string :as str]
             [et.mu.ui.state :as state]))
@@ -37,6 +39,9 @@
   (when (seq (str timestamp))
     (first (str/split (str timestamp) #" "))))
 
+(defn- toggle [s x]
+  (if (contains? s x) (disj s x) (conj s x)))
+
 (defn- compose-form []
   (let [input (r/atom "")
         note (r/atom "")]
@@ -58,7 +63,58 @@
            :on-change #(reset! note (-> % .-target .-value))}]
          [:button {:on-click submit :disabled (str/blank? @input)} "Post"]]))))
 
-(defn- card [{:keys [id video_id title note start_seconds created_at]} {:keys [logged-in? open]}]
+(defn- entity-checkbox [{:keys [id name]} chosen on-toggle]
+  [:label.entity-check
+   [:input {:type "checkbox"
+            :checked (contains? chosen id)
+            :on-change #(on-toggle id)}]
+   [:span name]])
+
+(defn- entity-groups
+  "Every entity there is, under its category heading."
+  [categories chosen on-toggle]
+  [:div.entity-groups
+   (for [{:keys [id name entities]} categories]
+     ^{:key id}
+     [:div.entity-group
+      [:div.entity-group-name name]
+      (if (empty? entities)
+        [:div.entity-group-empty "nothing here yet"]
+        (for [entity entities]
+          ^{:key (:id entity)}
+          [entity-checkbox entity chosen on-toggle]))])])
+
+(defn- no-vocabulary []
+  [:div.entity-groups-empty
+   "No entities yet — make some on the Categories page."])
+
+(defn- edit-modal
+  "Only the annotation layer is on offer here. Cancel simply drops the draft."
+  [video]
+  (let [description (r/atom (or (:description video) ""))
+        chosen (r/atom (set (map :id (:entities video))))]
+    (fn [video]
+      (let [{:keys [categories]} @state/*app-state]
+        [:div.modal-backdrop {:on-click state/stop-editing}
+         [:div.modal {:on-click #(.stopPropagation %)}
+          [:h2 "Annotate"]
+          [:div.modal-subtitle (or (:title video) (:video_id video))]
+          [:textarea.modal-description
+           {:placeholder "A description, for your eyes only"
+            :rows 4
+            :value @description
+            :on-change #(reset! description (-> % .-target .-value))}]
+          (if (empty? categories)
+            [no-vocabulary]
+            [entity-groups categories @chosen #(swap! chosen toggle %)])
+          [:div.modal-actions
+           [:button {:on-click #(state/update-video (:id video) @description @chosen
+                                                    state/stop-editing)}
+            "Save"]
+           [:button.secondary {:on-click state/stop-editing} "Cancel"]]]]))))
+
+(defn- card [{:keys [id video_id title note description entities start_seconds created_at] :as video}
+             {:keys [logged-in? open editing]}]
   (let [expanded? (contains? open id)
         start (or start_seconds 0)]
     [:div.card
@@ -77,23 +133,64 @@
                   :frameBorder "0"}]])
      (when (seq note)
        [:div.card-note note])
+     (when (seq description)
+       [:div.card-description
+        [:span.card-description-mark "Private"]
+        [:span.card-description-text description]])
+     (when (seq entities)
+       [:div.card-entities
+        (for [entity entities]
+          ^{:key (:id entity)}
+          [:span.entity-chip (:name entity)])])
      [:div.card-footer
       [:a.watch-link {:href (watch-url video_id start) :target "_blank" :rel "noreferrer"}
        "Watch on YouTube"]
       (when logged-in?
         [:span.card-actions
-         [:button.secondary.danger {:on-click #(state/delete-video id)} "Delete"]])]]))
+         [:button.secondary {:on-click #(state/start-editing id)} "Edit"]
+         [:button.secondary.danger {:on-click #(state/delete-video id)} "Delete"]])]
+     (when (= editing id)
+       [edit-modal video])]))
+
+(defn- filter-menu
+  "Opens on hover — the panel is a child of the trigger's wrapper and sits flush
+  under it, so there is no gap to fall through. The click toggle is what makes it
+  usable on touch, where `mobile.css` turns the hover rule off."
+  []
+  (let [pinned? (r/atom false)]
+    (fn []
+      (let [{:keys [categories filter-entities]} @state/*app-state
+            active (count filter-entities)]
+        [:div.filter-menu {:class (when @pinned? "pinned")
+                           :on-mouse-leave #(reset! pinned? false)}
+         [:button.secondary.filter-trigger {:on-click #(swap! pinned? not)}
+          "Filter"
+          (when (pos? active) [:span.filter-count active])]
+         [:div.filter-panel
+          [:div.filter-panel-head
+           [:span.filter-panel-title "Show only posts assigned to"]
+           (when (pos? active)
+             [:button.filter-clear {:on-click state/clear-filter-entities} "clear"])]
+          (if (empty? categories)
+            [no-vocabulary]
+            [entity-groups categories filter-entities state/toggle-filter-entity])]]))))
 
 (defn videos-tab []
-  (let [{:keys [videos search logged-in? open]} @state/*app-state]
+  (let [{:keys [videos search logged-in? open editing filter-entities]} @state/*app-state]
     [:div.feed
      (when logged-in? [compose-form])
-     [:input.search
-      {:type "text" :placeholder "Search"
-       :value search
-       :on-change #(state/set-search (-> % .-target .-value))}]
+     [:div.search-row
+      [:input.search
+       {:type "text" :placeholder "Search"
+        :value search
+        :on-change #(state/set-search (-> % .-target .-value))}]
+      (when logged-in? [filter-menu])]
      (if (empty? videos)
-       [:div.empty (if (seq search) "Nothing matches." "No videos yet.")]
+       [:div.empty (cond
+                     (and (seq filter-entities) (seq search)) "Nothing matches inside that filter."
+                     (seq filter-entities) "Nothing is assigned to that."
+                     (seq search) "Nothing matches."
+                     :else "No videos yet.")]
        (for [v videos]
          ^{:key (:id v)}
-         [card v {:logged-in? logged-in? :open open}]))]))
+         [card v {:logged-in? logged-in? :open open :editing editing}]))]))
