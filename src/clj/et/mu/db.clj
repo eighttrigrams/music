@@ -34,7 +34,11 @@
 (defn init-conn [{:keys [type path]}]
   (let [db-spec (case type
                   :sqlite-memory {:dbtype "sqlite" :dbname "file::memory:?cache=shared&busy_timeout=5000&read_uncommitted=true"}
-                  :sqlite-file {:dbtype "sqlite" :dbname path})
+                  ;; busy_timeout so a connection waits for a writer to finish
+                  ;; instead of failing the request outright: the annotation
+                  ;; writes are transactions, and concurrent PUTs would
+                  ;; otherwise meet SQLITE_BUSY.
+                  :sqlite-file {:dbtype "sqlite" :dbname (str path "?busy_timeout=5000")})
         ds (jdbc/get-datasource db-spec)
         ;; A shared-cache in-memory DB is dropped the instant its last
         ;; connection closes, so hold one open for the process lifetime purely
