@@ -1,7 +1,7 @@
 (ns et.mu.ui.views.categories
-  "The owner's vocabulary: categories (\"artist\", \"manufacturer\") holding entities
-  (\"Caroline Polachek\", \"Roland\"). Posts are assigned entities from the Edit
-  modal on a card, and the feed's filter menu narrows by them.
+  "The vocabulary the owner manages: categories (\"artist\", \"manufacturer\")
+  holding entities (\"Caroline Polachek\", \"Roland\"). Posts are assigned entities
+  from the Edit modal on a card, and the feed's filter menu narrows by them.
 
   Reading the vocabulary is public — it is what the feed's filter is made of, and
   anyone may filter. Making and unmaking it is not: this page is reachable only

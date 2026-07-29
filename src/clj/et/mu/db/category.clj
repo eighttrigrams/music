@@ -1,5 +1,5 @@
 (ns et.mu.db.category
-  "The owner's annotation vocabulary, and the join that hangs it off a post.
+  "The annotation vocabulary, and the join that hangs it off a post.
 
   A category (\"artist\", \"manufacturer\") holds entities (\"Caroline Polachek\",
   \"Roland\"); `video_entities` assigns any number of entities to a post. The
