@@ -66,22 +66,32 @@
                                   :note (or note "")
                                   :start-seconds (youtube/resolve-start-seconds input)})})))
 
+(defn- entity-ids-list?
+  "Whether a request's `entity-ids` is something we can carry out. JSON can hand
+  over anything, and the two ways of getting this wrong both end badly: a bare
+  number blows the assignment write up, while a string or an object holds no ids
+  the write can see and so would silently clear every assignment the post had.
+  Absent is a list of none, which is a legitimate way to clear them on purpose."
+  [entity-ids]
+  (or (nil? entity-ids) (sequential? entity-ids)))
+
 (defn update-video-handler
   "PUT /api/videos/:id — replace a post's owner-only annotation layer from
   {:description :entity-ids}, both wholesale (entity-ids has set semantics). The
   post itself is not editable: title, video, note and start time are untouched.
-  404 when the id matches nothing you own. Returns the post in the authenticated
-  shape."
+  400 when entity-ids is given as anything but a list of ids; 404 when the id
+  matches nothing you own. Returns the post in the authenticated shape."
   [req]
   (let [user-id (common/get-user-id req)
         id (common/parse-int-opt (get-in req [:params :id]))
-        {:keys [description entity-ids]} (:body req)
-        video (when id (db.video/update-video (common/ensure-ds) user-id id
-                                              {:description description
-                                               :entity-ids entity-ids}))]
-    (if video
-      {:status 200 :body video}
-      {:status 404 :body {:error "Video not found"}})))
+        {:keys [description entity-ids]} (:body req)]
+    (if-not (entity-ids-list? entity-ids)
+      {:status 400 :body {:error "entity-ids must be a list of ids"}}
+      (if-let [video (when id (db.video/update-video (common/ensure-ds) user-id id
+                                                     {:description description
+                                                      :entity-ids entity-ids}))]
+        {:status 200 :body video}
+        {:status 404 :body {:error "Video not found"}}))))
 
 (defn delete-video-handler
   "DELETE /api/videos/:id — remove a post together with its entity assignments."

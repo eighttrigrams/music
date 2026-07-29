@@ -103,6 +103,22 @@
     (testing "the phantom row never landed, so it cannot answer a filter either"
       (is (= [] (:body (GET-json "/api/videos?entities=4242")))))))
 
+(deftest put-rejects-entity-ids-that-are-not-a-list
+  (let [category (category! "artist")
+        entity (entity! (:id category) "Roland")
+        video (post! "Annotated")]
+    (PUT-json (str "/api/videos/" (:id video))
+              {:description "kept" :entity-ids [(:id entity)]})
+    (doseq [bad-shape [(:id entity) (str (:id entity)) {:id (:id entity)}]]
+      (testing (str "entity-ids as " (pr-str bad-shape))
+        (let [response (PUT-json (str "/api/videos/" (:id video))
+                                 {:description "clobbered" :entity-ids bad-shape})]
+          (is (= 400 (:status response)))
+          (is (= "entity-ids must be a list of ids" (:error (:body response))))))
+      (testing "the annotation layer is left as it was"
+        (is (= "kept" (:description (db.video/get-video *ds* (:id video) {:authed? true}))))
+        (is (= ["Roland"] (entity-names (:id video))))))))
+
 (deftest put-is-scoped-by-user
   (let [video (post! "Mine")
         stolen (API :put (str "/api/videos/" (:id video))
