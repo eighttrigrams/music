@@ -333,6 +333,9 @@ textarea:focus {
   font-size: 0.75em;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  /* One line either way, so checking the first entity — which brings `clear`
+     in beside it — does not shove the list down under the pointer. */
+  white-space: nowrap;
 }
 .filter-clear {
   padding: 0;

@@ -113,8 +113,8 @@
             "Save"]
            [:button.secondary {:on-click state/stop-editing} "Cancel"]]]]))))
 
-(defn- card [{:keys [id video_id title note description entities start_seconds created_at] :as video}
-             {:keys [logged-in? open editing]}]
+(defn- card [{:keys [id video_id title note description entities start_seconds created_at]}
+             {:keys [logged-in? open]}]
   (let [expanded? (contains? open id)
         start (or start_seconds 0)]
     [:div.card
@@ -148,9 +148,7 @@
       (when logged-in?
         [:span.card-actions
          [:button.secondary {:on-click #(state/start-editing id)} "Edit"]
-         [:button.secondary.danger {:on-click #(state/delete-video id)} "Delete"]])]
-     (when (= editing id)
-       [edit-modal video])]))
+         [:button.secondary.danger {:on-click #(state/delete-video id)} "Delete"]])]]))
 
 (defn- filter-menu
   "Opens on hover — the panel is a child of the trigger's wrapper and sits flush
@@ -168,7 +166,7 @@
           (when (pos? active) [:span.filter-count active])]
          [:div.filter-panel
           [:div.filter-panel-head
-           [:span.filter-panel-title "Show only posts assigned to"]
+           [:span.filter-panel-title "Assigned to"]
            (when (pos? active)
              [:button.filter-clear {:on-click state/clear-filter-entities} "clear"])]
           (if (empty? categories)
@@ -193,4 +191,9 @@
                      :else "No videos yet.")]
        (for [v videos]
          ^{:key (:id v)}
-         [card v {:logged-in? logged-in? :open open :editing editing}]))]))
+         [card v {:logged-in? logged-in? :open open}]))
+     ;; Deliberately outside the cards: a card's backdrop-filter would make it
+     ;; the containing block for the modal's fixed positioning, which pins the
+     ;; modal to that one card instead of to the viewport.
+     (when-let [video (first (filter #(= editing (:id %)) videos))]
+       [edit-modal video])]))
