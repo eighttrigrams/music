@@ -94,23 +94,33 @@
   "Replace the post's annotation layer: the description and the whole entity set,
   both wholesale. The post itself is untouched — title, video, note and start
   time stay immutable. Scoped by user_id like `delete-video`; nil when the id
-  matches nothing the user owns."
-  [ds user-id id {:keys [description entity-ids]}]
-  (let [result (jdbc/execute-one! (db/get-conn ds)
-                 (sql/format {:update :videos
-                              :set {:description (or description "")}
-                              :where [:and [:= :id id] (db/user-id-where-clause user-id)]}))]
-    (when (pos? (:next.jdbc/update-count result))
-      (db.category/set-video-entities ds id entity-ids)
-      (tel/log! {:level :info :data {:id id :user-id user-id :entities (count entity-ids)}}
-                "Video annotated")
-      (get-video ds id {:authed? true}))))
+  matches nothing the user owns.
 
-(defn delete-video [ds user-id id]
-  (let [result (jdbc/execute-one! (db/get-conn ds)
-                 (sql/format {:delete-from :videos
-                              :where [:and [:= :id id] (db/user-id-where-clause user-id)]}))]
-    (when (pos? (:next.jdbc/update-count result))
-      (db.category/clear-video-entities ds id)
-      (tel/log! {:level :info :data {:id id :user-id user-id}} "Video deleted")
-      {:success true})))
+  The description and the entity set are two writes but one edit, so they go in
+  one transaction: a bad `entity-ids` used to leave the description updated and
+  the assignments cleared."
+  [ds user-id id {:keys [description entity-ids]}]
+  (jdbc/with-transaction [tx (db/get-conn ds)]
+    (let [result (jdbc/execute-one! tx
+                   (sql/format {:update :videos
+                                :set {:description (or description "")}
+                                :where [:and [:= :id id] (db/user-id-where-clause user-id)]}))]
+      (when (pos? (:next.jdbc/update-count result))
+        (db.category/set-video-entities tx id entity-ids)
+        (tel/log! {:level :info :data {:id id :user-id user-id :entities (count entity-ids)}}
+                  "Video annotated")
+        (get-video tx id {:authed? true})))))
+
+(defn delete-video
+  "Remove a post the user owns, together with its entity assignments. Join rows
+  first, like every other delete path, and both in one transaction."
+  [ds user-id id]
+  (jdbc/with-transaction [tx (db/get-conn ds)]
+    (let [own [:and [:= :id id] (db/user-id-where-clause user-id)]]
+      (when (jdbc/execute-one! tx
+              (sql/format {:select [:id] :from [:videos] :where own})
+              db/jdbc-opts)
+        (db.category/clear-video-entities tx id)
+        (jdbc/execute-one! tx (sql/format {:delete-from :videos :where own}))
+        (tel/log! {:level :info :data {:id id :user-id user-id}} "Video deleted")
+        {:success true}))))

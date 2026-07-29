@@ -82,6 +82,28 @@
     (is (= {:success true} (db.video/delete-video *ds* *user-id* doomed)))
     (is (= [{:video_id keeper :entity_id entity}] (join-rows)))))
 
+(deftest deleting-somebody-elses-video-leaves-its-join-rows
+  (let [category (:id (db.category/add-category *ds* "artist"))
+        entity (:id (db.category/add-entity *ds* category "Roland"))
+        video (:id (post! "Mine"))]
+    (db.video/update-video *ds* *user-id* video {:description "" :entity-ids [entity]})
+    (is (nil? (db.video/delete-video *ds* 9999 video)))
+    (is (some? (db.video/get-video *ds* video)))
+    (is (= [{:video_id video :entity_id entity}] (join-rows)))))
+
+(deftest an-annotation-write-that-throws-changes-nothing
+  (let [category (:id (db.category/add-category *ds* "artist"))
+        entity (:id (db.category/add-entity *ds* category "Roland"))
+        video (:id (post! "Atomic"))]
+    (db.video/update-video *ds* *user-id* video {:description "kept" :entity-ids [entity]})
+    (is (thrown? Exception
+                 (db.video/update-video *ds* *user-id* video
+                                        {:description "clobbered" :entity-ids 42})))
+    (testing "the description is not updated with the assignments cleared"
+      (is (= "kept" (:description (db.video/get-video *ds* video {:authed? true}))))
+      (is (= ["Roland"] (map :name (entities-of video))))
+      (is (= [{:video_id video :entity_id entity}] (join-rows))))))
+
 (deftest reset-all-data-clears-the-annotation-tables-too
   (let [category (:id (db.category/add-category *ds* "artist"))
         entity (:id (db.category/add-entity *ds* category "Roland"))
