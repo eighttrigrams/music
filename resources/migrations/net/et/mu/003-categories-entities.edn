@@ -1,0 +1,26 @@
+{:up ["CREATE TABLE categories (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         name TEXT NOT NULL UNIQUE,
+         created_at DATETIME DEFAULT (datetime('now'))
+       )"
+      "CREATE TABLE entities (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         name TEXT NOT NULL,
+         category_id INTEGER REFERENCES categories(id),
+         created_at DATETIME DEFAULT (datetime('now')),
+         UNIQUE(category_id, name)
+       )"
+      "CREATE INDEX idx_entities_category ON entities (category_id)"
+      "CREATE TABLE video_entities (
+         video_id INTEGER REFERENCES videos(id),
+         entity_id INTEGER REFERENCES entities(id),
+         PRIMARY KEY (video_id, entity_id)
+       )"
+      "CREATE INDEX idx_video_entities_entity ON video_entities (entity_id)"
+      "ALTER TABLE videos ADD COLUMN description TEXT DEFAULT ''"]
+ :down ["ALTER TABLE videos DROP COLUMN description"
+        "DROP INDEX IF EXISTS idx_video_entities_entity"
+        "DROP TABLE IF EXISTS video_entities"
+        "DROP INDEX IF EXISTS idx_entities_category"
+        "DROP TABLE IF EXISTS entities"
+        "DROP TABLE IF EXISTS categories"]}

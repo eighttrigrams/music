@@ -70,6 +70,9 @@
                     terms)))))))
 
 (defn reset-all-data!
-  "Dev-only: wipe user data (keeps schema)."
+  "Dev-only: wipe user data (keeps schema). Join rows first, so nothing is left
+  pointing at a row that is already gone."
   [ds]
-  (jdbc/execute-one! (get-conn ds) (sql/format {:delete-from :videos})))
+  (let [conn (get-conn ds)]
+    (doseq [table [:video_entities :entities :categories :videos]]
+      (jdbc/execute-one! conn (sql/format {:delete-from table})))))

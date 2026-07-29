@@ -8,18 +8,33 @@
   pasted URL itself is never stored. The title comes from YouTube's oEmbed
   endpoint at post time.
 
-  A post is **immutable**: it can be made and it can be deleted, never edited. So
-  there is no update fn here, and no use for the `modified_at`
-  optimistic-concurrency guard the other plurama apps rely on.
+  The **post is immutable**: title, video, note and start time can be made and
+  deleted, never edited. `update-video` is not a counter-example — it writes only
+  the owner's annotation layer (`description` and the entity assignments in
+  `et.mu.db.category`), which sits beside the post rather than in it. So there is
+  still no use for the `modified_at` optimistic-concurrency guard the other
+  plurama apps rely on.
+
+  That annotation layer is private to the signed-in owner, and this is where the
+  visibility rule is kept honest: the reads take an `authed?` flag and the
+  columns they select depend on it, so an anonymous response does not carry
+  `:description` or `:entities` at all — there is nothing for a client to hide.
 
   Nothing is unique here on purpose: posting the same video twice is a legitimate
   thing to do, so it is two posts."
   (:require [next.jdbc :as jdbc]
             [honey.sql :as sql]
             [taoensso.telemere :as tel]
-            [et.mu.db :as db]))
+            [et.mu.db :as db]
+            [et.mu.db.category :as db.category]))
 
 (def select-columns [:id :video_id :title :note :start_seconds :created_at])
+
+(def ^:private authed-select-columns (conj select-columns :description))
+
+(defn- with-entities [ds videos]
+  (let [by-video (db.category/entities-by-video ds (map :id videos))]
+    (mapv (fn [{:keys [id] :as video}] (assoc video :entities (get by-video id []))) videos)))
 
 (defn add-video [ds user-id {:keys [video-id title note start-seconds]}]
   (let [result (jdbc/execute-one! (db/get-conn ds)
@@ -45,30 +60,57 @@
 
 (defn list-videos
   "Newest post first, optionally narrowed by a substring search over title and
-  note. Public: returns every post regardless of who is asking."
+  note and by an entity filter (any of `entity-ids`, ANDed with the search).
+  Public: returns every post regardless of who is asking. `authed?` decides
+  whether the annotation layer is part of the shape at all."
   ([ds] (list-videos ds {}))
-  ([ds {:keys [search-term]}]
-   (let [search-clause (db/build-search-clause search-term [:title :note])]
-     (jdbc/execute! (db/get-conn ds)
-       (sql/format (cond-> {:select select-columns
-                            :from [:videos]
-                            :order-by [[:created_at :desc] [:id :desc]]}
-                     search-clause (assoc :where search-clause)))
-       db/jdbc-opts))))
+  ([ds {:keys [search-term entity-ids authed?]}]
+   (let [clauses (remove nil? [(db/build-search-clause search-term [:title :note])
+                               (db.category/video-filter-clause entity-ids)])
+         videos (jdbc/execute! (db/get-conn ds)
+                  (sql/format (cond-> {:select (if authed? authed-select-columns select-columns)
+                                       :from [:videos]
+                                       :order-by [[:created_at :desc] [:id :desc]]}
+                                (seq clauses) (assoc :where (into [:and] clauses))))
+                  db/jdbc-opts)]
+     (if authed? (with-entities ds videos) videos))))
 
 (defn get-video
-  "One post by id. Public, like the listing."
-  [ds id]
-  (jdbc/execute-one! (db/get-conn ds)
-    (sql/format {:select select-columns
-                 :from [:videos]
-                 :where [:= :id id]})
-    db/jdbc-opts))
+  "One post by id. Public, like the listing — and like the listing, only an
+  `authed?` read carries the annotation layer."
+  ([ds id] (get-video ds id {}))
+  ([ds id {:keys [authed?]}]
+   (let [video (jdbc/execute-one! (db/get-conn ds)
+                 (sql/format {:select (if authed? authed-select-columns select-columns)
+                              :from [:videos]
+                              :where [:= :id id]})
+                 db/jdbc-opts)]
+     (cond
+       (nil? video) nil
+       authed? (first (with-entities ds [video]))
+       :else video))))
+
+(defn update-video
+  "Replace the post's annotation layer: the description and the whole entity set,
+  both wholesale. The post itself is untouched — title, video, note and start
+  time stay immutable. Scoped by user_id like `delete-video`; nil when the id
+  matches nothing the user owns."
+  [ds user-id id {:keys [description entity-ids]}]
+  (let [result (jdbc/execute-one! (db/get-conn ds)
+                 (sql/format {:update :videos
+                              :set {:description (or description "")}
+                              :where [:and [:= :id id] (db/user-id-where-clause user-id)]}))]
+    (when (pos? (:next.jdbc/update-count result))
+      (db.category/set-video-entities ds id entity-ids)
+      (tel/log! {:level :info :data {:id id :user-id user-id :entities (count entity-ids)}}
+                "Video annotated")
+      (get-video ds id {:authed? true}))))
 
 (defn delete-video [ds user-id id]
   (let [result (jdbc/execute-one! (db/get-conn ds)
                  (sql/format {:delete-from :videos
                               :where [:and [:= :id id] (db/user-id-where-clause user-id)]}))]
     (when (pos? (:next.jdbc/update-count result))
+      (db.category/clear-video-entities ds id)
       (tel/log! {:level :info :data {:id id :user-id user-id}} "Video deleted")
       {:success true})))
