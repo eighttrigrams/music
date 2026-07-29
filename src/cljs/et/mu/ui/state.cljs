@@ -65,8 +65,8 @@
 (declare fetch-categories)
 
 (defn fetch-auth-required
-  "Reading is public, so the feed is fetched either way. `required` only decides
-  whether the posting affordances show up."
+  "Reading is public, so the feed and the vocabulary behind the filter are fetched
+  either way. `required` only decides whether the posting affordances show up."
   []
   (api/fetch-json "/api/auth/required" {}
     (fn [{:keys [required]}]
@@ -81,7 +81,7 @@
                    :token token
                    :current-user (js->clj (js/JSON.parse user-str) :keywordize-keys true)))))
       (fetch-videos)
-      (when (:logged-in? @*app-state) (fetch-categories)))))
+      (fetch-categories))))
 
 (defn login [username password on-success]
   (api/post-json "/api/auth/login" {:username username :password password} {}
@@ -96,14 +96,15 @@
 (defn logout
   "Signing out has to strip the annotation layer from the client too, not just
   hide it: the videos are refetched so they come back without descriptions or
-  entities, and everything built on top of them is dropped. The feed goes with
+  entities, and the Edit modal built on top of them is dropped. The feed goes with
   them in the same swap, or the annotated payload stays on screen for the whole
-  round-trip."
+  round-trip. The vocabulary and whatever it is narrowed to are public, so they
+  stay — signing out narrows the same feed as before, minus the chips."
   []
   (clear-token!)
   (swap! *app-state assoc
          :logged-in? false :token nil :current-user nil
-         :page :feed :categories [] :filter-entities #{} :editing nil :videos [])
+         :page :feed :editing nil :videos [])
   (fetch-videos))
 
 ;; ---------------------------------------------------------------------------

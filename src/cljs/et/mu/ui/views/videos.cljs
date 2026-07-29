@@ -9,9 +9,13 @@
 
   The **post is immutable**: title, video and note can be posted and deleted,
   never edited. What Edit reaches is the annotation layer beside it — the owner's
-  private description and the entities the post is assigned to. That layer, the
-  filter menu and Delete all appear only once signed in; an anonymous visitor is
-  never sent the data behind them, so there is nothing here that hides it."
+  private description and the entities the post is assigned to. That layer, Edit
+  and Delete appear only once signed in; an anonymous visitor is never sent the
+  data behind them, so there is nothing here that hides it.
+
+  The filter menu is not part of that layer: the vocabulary is public and so is
+  filtering by it, so everyone gets the menu. A visitor may therefore narrow the
+  feed to an entity and still see no chips on what comes back — intended."
   (:require [reagent.core :as r]
             [clojure.string :as str]
             [et.mu.ui.state :as state]))
@@ -84,9 +88,15 @@
           ^{:key (:id entity)}
           [entity-checkbox entity chosen on-toggle]))])])
 
-(defn- no-vocabulary []
+(defn- no-vocabulary
+  "Nothing to check. Only the owner can do anything about that, and only the owner
+  can reach the page where it is done, so a visitor is told the fact and left
+  there."
+  []
   [:div.entity-groups-empty
-   "No entities yet — make some on the Categories page."])
+   (if (:logged-in? @state/*app-state)
+     "No entities yet — make some on the Categories page."
+     "Nothing to filter by yet.")])
 
 (defn- no-entities?
   "Categories with nothing in them are as empty as no categories at all: either
@@ -189,7 +199,7 @@
        {:type "text" :placeholder "Search"
         :value search
         :on-change #(state/set-search (-> % .-target .-value))}]
-      (when logged-in? [filter-menu])]
+      [filter-menu]]
      (if (empty? videos)
        [:div.empty (cond
                      (and (seq filter-entities) (seq search)) "Nothing matches inside that filter."

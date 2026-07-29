@@ -3,8 +3,9 @@
   (\"Caroline Polachek\", \"Roland\"). Posts are assigned entities from the Edit
   modal on a card, and the feed's filter menu narrows by them.
 
-  The page exists only for the signed-in owner — the server answers 401 to an
-  anonymous request for any of it."
+  Reading the vocabulary is public — it is what the feed's filter is made of, and
+  anyone may filter. Making and unmaking it is not: this page is reachable only
+  when signed in, and every write it does is a mutation the server gates."
   (:require [reagent.core :as r]
             [clojure.string :as str]
             [et.mu.ui.state :as state]))
