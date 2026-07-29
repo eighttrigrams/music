@@ -4,19 +4,50 @@
             [et.mu.db.video :as db.video]
             [et.mu.youtube :as youtube]))
 
+;; `wrap-auth` only gates mutating requests, so these reads decide the
+;; annotation layer's visibility themselves — a valid Bearer token or dev
+;; skip-logins counts as the owner, anybody else is an anonymous visitor.
+(defn- authenticated? [req]
+  (some? (common/get-user-from-request req)))
+
+(def ^:private unauthorized
+  {:status 401 :body {:error "Authentication required"}})
+
+(defn- parse-entity-ids
+  "`1,2,5`. Tokens that are not ids are ignored, so an effectively empty param
+  narrows nothing."
+  [param]
+  (when param
+    (->> (str/split param #",")
+         (keep common/parse-int-opt)
+         distinct
+         vec)))
+
 (defn list-videos-handler
   "GET /api/videos — the posted videos, newest first, optionally filtered by
-  ?search over title and note. Public: the same feed whether or not you are
-  signed in."
+  ?search over title and note and by ?entities=1,2,5 (posts assigned to any of
+  them, ANDed with the search). Public: the same feed whether or not you are
+  signed in, except that an authenticated response also carries each post's
+  :description and :entities. ?entities is part of that owner-only layer, so an
+  anonymous request using it gets 401."
   [req]
-  (let [search (get-in req [:query-params "search"])]
-    {:status 200 :body (db.video/list-videos (common/ensure-ds) {:search-term search})}))
+  (let [authed? (authenticated? req)
+        entities-param (get-in req [:query-params "entities"])]
+    (if (and (some? entities-param) (not authed?))
+      unauthorized
+      {:status 200
+       :body (db.video/list-videos (common/ensure-ds)
+                                   {:search-term (get-in req [:query-params "search"])
+                                    :entity-ids (parse-entity-ids entities-param)
+                                    :authed? authed?})})))
 
 (defn get-video-handler
-  "GET /api/videos/:id — a single post. Public, like the listing."
+  "GET /api/videos/:id — a single post. Public, like the listing, and like the
+  listing it carries :description and :entities only when authenticated."
   [req]
   (let [id (common/parse-int-opt (get-in req [:params :id]))
-        video (when id (db.video/get-video (common/ensure-ds) id))]
+        video (when id (db.video/get-video (common/ensure-ds) id
+                                           {:authed? (authenticated? req)}))]
     (if video
       {:status 200 :body video}
       {:status 404 :body {:error "Video not found"}})))
@@ -28,7 +59,8 @@
   share-tracking params like `si=` are discarded. The title is fetched from
   YouTube unless one is given. 400 when the input names no video.
 
-  There is no PUT counterpart — a post is immutable once made."
+  The PUT counterpart reaches only the annotation layer — the post itself is
+  immutable once made."
   [req]
   (let [user-id (common/get-user-id req)
         {:keys [input note title]} (:body req)
@@ -43,8 +75,25 @@
                                   :note (or note "")
                                   :start-seconds (youtube/resolve-start-seconds input)})})))
 
+(defn update-video-handler
+  "PUT /api/videos/:id — replace a post's owner-only annotation layer from
+  {:description :entity-ids}, both wholesale (entity-ids has set semantics). The
+  post itself is not editable: title, video, note and start time are untouched.
+  404 when the id matches nothing you own. Returns the post in the authenticated
+  shape."
+  [req]
+  (let [user-id (common/get-user-id req)
+        id (common/parse-int-opt (get-in req [:params :id]))
+        {:keys [description entity-ids]} (:body req)
+        video (when id (db.video/update-video (common/ensure-ds) user-id id
+                                              {:description description
+                                               :entity-ids entity-ids}))]
+    (if video
+      {:status 200 :body video}
+      {:status 404 :body {:error "Video not found"}})))
+
 (defn delete-video-handler
-  "DELETE /api/videos/:id — remove a post."
+  "DELETE /api/videos/:id — remove a post together with its entity assignments."
   [req]
   (let [user-id (common/get-user-id req)
         id (common/parse-int-opt (get-in req [:params :id]))

@@ -4,12 +4,13 @@
             [et.mu.server.common :as common]
             [et.mu.server.user-handler :as user-handler]
             [et.mu.server.video-handler :as video-handler]
+            [et.mu.server.category-handler :as category-handler]
             [et.mu.auth :as auth]
             [et.mu.server.recording-mode :as recording-mode]
             [et.mu.middleware.rate-limit :as rate-limit :refer [wrap-rate-limit]]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [compojure.core :refer [defroutes GET POST DELETE context]]
+            [compojure.core :refer [defroutes GET POST PUT DELETE context]]
             [compojure.route :as route]
             [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
             [ring.middleware.params :refer [wrap-params]]
@@ -62,7 +63,8 @@
   on each handler *is* the API documentation."
   '[et.mu.server
     et.mu.server.user-handler
-    et.mu.server.video-handler])
+    et.mu.server.video-handler
+    et.mu.server.category-handler])
 
 (def ^:private route-doc-re
   "Route handlers document themselves as `METHOD /path — explanation`. Matching
@@ -115,12 +117,23 @@
       (GET  "/me"       [] user-handler/me-handler)
       (POST "/login"    [] user-handler/login-handler))
 
-    ;; No PUT — a post is immutable; it can only be made or deleted.
+    ;; The one PUT carries the owner's annotation layer and nothing else — the
+    ;; post itself is immutable; it can only be made or deleted.
     (context "/videos" []
       (GET    "/"    [] video-handler/list-videos-handler)
       (POST   "/"    [] video-handler/add-video-handler)
       (GET    "/:id" [] video-handler/get-video-handler)
+      (PUT    "/:id" [] video-handler/update-video-handler)
       (DELETE "/:id" [] video-handler/delete-video-handler))
+
+    (context "/categories" []
+      (GET    "/"             [] category-handler/list-categories-handler)
+      (POST   "/"             [] category-handler/add-category-handler)
+      (DELETE "/:id"          [] category-handler/delete-category-handler)
+      (POST   "/:id/entities" [] category-handler/add-entity-handler))
+
+    (context "/entities" []
+      (DELETE "/:id" [] category-handler/delete-entity-handler))
 
     (context "/test" []
       (POST "/reset" [] reset-test-db-handler))))
@@ -161,7 +174,7 @@
       (wrap-auth prod?)
       (wrap-json-response)
       (wrap-cors :access-control-allow-origin [#".*"]
-                 :access-control-allow-methods [:get :post :delete])
+                 :access-control-allow-methods [:get :post :put :delete])
       (wrap-rate-limit (env-int "RATE_LIMIT_MAX_REQUESTS" (if prod? 180 720))
                        (env-int "RATE_LIMIT_WINDOW_SECONDS" 60))))
 
