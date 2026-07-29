@@ -7,7 +7,7 @@
             [et.mu.db.category :as db.category]
             [et.mu.db.video :as db.video]
             [et.mu.integration-helpers :refer [with-integration-db with-real-auth
-                                               *ds* *user-id* API token-for]]))
+                                               with-prod-app *ds* *user-id* API token-for]]))
 
 (use-fixtures :each with-integration-db)
 
@@ -67,6 +67,18 @@
                                {:token (token-for *user-id*)}))))
       (testing "a plain search stays public"
         (is (= 200 (:status (API :get "/api/videos?search=bunny" {:anonymous? true}))))))))
+
+(deftest the-mutating-category-routes-are-gated-by-wrap-auth
+  (with-prod-app
+    (is (= 401 (:status (API :post "/api/categories" {:anonymous? true :body {:name "artist"}}))))
+    (is (= 401 (:status (API :post "/api/categories" {:body {:name "artist"}})))
+        "the dev skip-logins header buys nothing once the wrapper is active")
+    (is (= [] (:body (API :get "/api/categories" {:token (token-for *user-id*)})))
+        "neither 401 wrote anything")
+    (let [created (API :post "/api/categories" {:token (token-for *user-id*)
+                                                :body {:name "artist"}})]
+      (is (= 201 (:status created)))
+      (is (= "artist" (:name (:body created)))))))
 
 (deftest dev-skip-logins-counts-as-the-owner
   (seed!)

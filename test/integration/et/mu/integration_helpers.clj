@@ -40,14 +40,35 @@
           (.close pc))))))
 
 (defn with-real-auth* [f]
-  (with-redefs [common/allow-skip-logins? (constantly false)]
-    (f)))
+  (let [config @common/*config]
+    (try
+      (swap! common/*config assoc :dangerously-skip-logins? false)
+      (f)
+      (finally (reset! common/*config config)))))
 
 (defmacro with-real-auth
-  "Build the app as if `:dangerously-skip-logins?` were false, so a request
-  without a Bearer token is a genuinely anonymous one."
+  "Run the body with `:dangerously-skip-logins?` false in the config, so a request
+  without a Bearer token is a genuinely anonymous one. The config value rather
+  than a redef of `allow-skip-logins?`, so the real code path is the one under
+  test."
   [& body]
   `(with-real-auth* (fn [] ~@body)))
+
+(defn with-prod-app* [f]
+  (let [config @common/*config]
+    (try
+      (with-redefs [common/prod-mode? (constantly true)]
+        (binding [*app* (server/build-app {})]
+          (f)))
+      (finally (reset! common/*config config)))))
+
+(defmacro with-prod-app
+  "Run the body against the app as production assembles it — `wrap-auth` in the
+  chain, so a mutating request without a valid token never reaches a handler.
+  `build-app` decides that from `prod-mode?`, hence the redef; skip-logins is off
+  either way once prod-mode? says yes."
+  [& body]
+  `(with-prod-app* (fn [] ~@body)))
 
 (defn token-for [user-id]
   (auth/create-token user-id "test-user" true))
