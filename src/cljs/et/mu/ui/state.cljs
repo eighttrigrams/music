@@ -29,6 +29,7 @@
            :page :feed           ;; :feed or :categories
            :categories []        ;; the owner's vocabulary, entities nested
            :filter-entities #{}  ;; entity ids the feed is narrowed to
+           :videos-request 0     ;; only the newest feed request may land
            :editing nil}))       ;; id of the post whose Edit modal is open
 
 ;; ---------------------------------------------------------------------------
@@ -95,12 +96,14 @@
 (defn logout
   "Signing out has to strip the annotation layer from the client too, not just
   hide it: the videos are refetched so they come back without descriptions or
-  entities, and everything built on top of them is dropped."
+  entities, and everything built on top of them is dropped. The feed goes with
+  them in the same swap, or the annotated payload stays on screen for the whole
+  round-trip."
   []
   (clear-token!)
   (swap! *app-state assoc
          :logged-in? false :token nil :current-user nil
-         :page :feed :categories [] :filter-entities #{} :editing nil)
+         :page :feed :categories [] :filter-entities #{} :editing nil :videos [])
   (fetch-videos))
 
 ;; ---------------------------------------------------------------------------
@@ -118,9 +121,17 @@
       (str "/api/videos?" (str/join "&" params))
       "/api/videos")))
 
-(defn fetch-videos []
-  (api/fetch-json (videos-url) (auth-headers)
-    (fn [videos] (swap! *app-state assoc :videos (vec videos)))))
+(defn fetch-videos
+  "Filters and searches change faster than the feed comes back, and responses can
+  arrive out of order, so each request takes a number and only the newest one is
+  allowed to write: otherwise a superseded response wins and the feed sits there
+  disagreeing with the checked boxes."
+  []
+  (let [request (:videos-request (swap! *app-state update :videos-request inc))]
+    (api/fetch-json (videos-url) (auth-headers)
+      (fn [videos]
+        (when (= request (:videos-request @*app-state))
+          (swap! *app-state assoc :videos (vec videos)))))))
 
 (defn set-search [s]
   (swap! *app-state assoc :search s)

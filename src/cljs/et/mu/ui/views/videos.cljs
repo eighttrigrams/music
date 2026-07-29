@@ -88,6 +88,13 @@
   [:div.entity-groups-empty
    "No entities yet — make some on the Categories page."])
 
+(defn- no-entities?
+  "Categories with nothing in them are as empty as no categories at all: either
+  way there is nothing to check, so the pointer at the Categories page is what to
+  show rather than a heading with `nothing here yet` under it."
+  [categories]
+  (empty? (mapcat :entities categories)))
+
 (defn- edit-modal
   "Only the annotation layer is on offer here. Cancel simply drops the draft."
   [video]
@@ -104,7 +111,7 @@
             :rows 4
             :value @description
             :on-change #(reset! description (-> % .-target .-value))}]
-          (if (empty? categories)
+          (if (no-entities? categories)
             [no-vocabulary]
             [entity-groups categories @chosen #(swap! chosen toggle %)])
           [:div.modal-actions
@@ -169,7 +176,7 @@
            [:span.filter-panel-title "Assigned to"]
            (when (pos? active)
              [:button.filter-clear {:on-click state/clear-filter-entities} "clear"])]
-          (if (empty? categories)
+          (if (no-entities? categories)
             [no-vocabulary]
             [entity-groups categories filter-entities state/toggle-filter-entity])]]))))
 
