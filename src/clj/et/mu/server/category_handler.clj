@@ -11,11 +11,19 @@
     {:status 200 :body (db.category/list-categories (common/ensure-ds))}
     common/unauthorized))
 
-(defn add-category-handler
-  "POST /api/categories — create a category from {:name}. 400 on a blank name or
-  one already taken."
+(defn- posted-name
+  "The name a request offers, or nil when it offered no string. JSON can hand over
+  anything, and coercing an object or a number into a name would create something
+  nobody asked for; anything that is not a string is as good as blank."
   [req]
-  (let [name (some-> (get-in req [:body :name]) str str/trim)]
+  (let [name (get-in req [:body :name])]
+    (when (string? name) (str/trim name))))
+
+(defn add-category-handler
+  "POST /api/categories — create a category from {:name}. 400 on a blank name, one
+  already taken, or a name that is not a string."
+  [req]
+  (let [name (posted-name req)]
     (if (str/blank? name)
       {:status 400 :body {:error "Name required"}}
       (if-let [category (db.category/add-category (common/ensure-ds) name)]
@@ -34,12 +42,12 @@
 
 (defn add-entity-handler
   "POST /api/categories/:id/entities — add an entity named {:name} to the
-  category. 400 on a blank name or one already taken inside it, 404 when the
-  category is unknown."
+  category. 400 on a blank name, one already taken inside it, or a name that is
+  not a string; 404 when the category is unknown."
   [req]
   (let [ds (common/ensure-ds)
         category-id (common/parse-int-opt (get-in req [:params :id]))
-        name (some-> (get-in req [:body :name]) str str/trim)]
+        name (posted-name req)]
     (cond
       (nil? (some->> category-id (db.category/get-category ds)))
       {:status 404 :body {:error "Category not found"}}

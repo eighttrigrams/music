@@ -30,6 +30,11 @@
       (is (= 400 (:status (POST-json "/api/categories" {:name "artist"}))))
       (is (= 400 (:status (POST-json "/api/categories" {:name "   "}))))
       (is (= 400 (:status (POST-json "/api/categories" {})))))
+    (testing "so is a name that is not a string"
+      (is (= 400 (:status (POST-json "/api/categories" {:name {:a 1}}))))
+      (is (= 400 (:status (POST-json "/api/categories" {:name 42}))))
+      (is (= 400 (:status (POST-json "/api/categories" {:name ["a"]}))))
+      (is (= ["artist"] (map :name (:body (GET-json "/api/categories"))))))
     (testing "delete answers 404 the second time"
       (is (= 200 (:status (DELETE-json (str "/api/categories/" (:id (:body created)))))))
       (is (= 404 (:status (DELETE-json (str "/api/categories/" (:id (:body created)))))))
@@ -47,6 +52,8 @@
                                      {:name "Caroline Polachek"}))))
       (is (= 400 (:status (POST-json (str "/api/categories/" (:id category) "/entities")
                                      {:name ""}))))
+      (is (= 400 (:status (POST-json (str "/api/categories/" (:id category) "/entities")
+                                     {:name {:a 1}}))))
       (is (= 404 (:status (POST-json "/api/categories/9999/entities" {:name "Nobody"})))))
     (testing "the same name is free inside another category"
       (let [other (category! "band")]
