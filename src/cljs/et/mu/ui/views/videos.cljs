@@ -165,7 +165,11 @@
       (when logged-in?
         [:span.card-actions
          [:button.secondary {:on-click #(state/start-editing id)} "Edit"]
-         [:button.secondary.danger {:on-click #(state/delete-video id)} "Delete"]])]]))
+         [:button.secondary.danger
+          {:on-click #(when (js/confirm (str "Delete \"" (or title video_id)
+                                             "\"? The post is gone for good."))
+                        (state/delete-video id))}
+          "Delete"]])]]))
 
 (defn- filter-menu
   "Opens on hover — the panel is a child of the trigger's wrapper and sits flush
