@@ -4,8 +4,7 @@
   A card shows the title, the note and when it was posted. Clicking the header
   expands the embedded player in place, so several posts can sit play-ready at
   once without leaving the page. A post that was pasted with a `t=` offset starts
-  there — both in the embed and in the outbound link — and shows the offset as a
-  badge.
+  there and shows the offset as a badge.
 
   The **post is immutable**: title, video and note can be posted and deleted,
   never edited. What Edit reaches is the annotation layer beside it — the owner's
@@ -23,10 +22,6 @@
 (defn- embed-url [video-id start-seconds]
   (str "https://www.youtube-nocookie.com/embed/" video-id
        (when (pos? (or start-seconds 0)) (str "?start=" start-seconds))))
-
-(defn- watch-url [video-id start-seconds]
-  (str "https://www.youtube.com/watch?v=" video-id
-       (when (pos? (or start-seconds 0)) (str "&t=" start-seconds))))
 
 (defn- hms
   "Seconds as `m:ss`, or `h:mm:ss` once it runs past an hour."
@@ -159,17 +154,15 @@
         (for [entity entities]
           ^{:key (:id entity)}
           [:span.entity-chip (:name entity)])])
-     [:div.card-footer
-      [:a.watch-link {:href (watch-url video_id start) :target "_blank" :rel "noreferrer"}
-       "Watch on YouTube"]
-      (when logged-in?
+     (when logged-in?
+       [:div.card-footer
         [:span.card-actions
          [:button.secondary {:on-click #(state/start-editing id)} "Edit"]
          [:button.secondary.danger
           {:on-click #(when (js/confirm (str "Delete \"" (or title video_id)
                                              "\"? The post is gone for good."))
                         (state/delete-video id))}
-          "Delete"]])]]))
+          "Delete"]]])]))
 
 (defn- filter-menu
   "Opens on hover — the panel is a child of the trigger's wrapper and sits flush

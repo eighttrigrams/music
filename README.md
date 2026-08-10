@@ -21,7 +21,7 @@ Only what identifies the video is kept — the pasted URL is never stored:
 
 - a `t=` **start offset is preserved** (`t=421`, `t=421s`, `t=7m1s`, `t=1h2m3s`,
   `#t=`, and an embed's `start=` all land as seconds). The card shows it as a
-  `7:01` badge, the embed starts there, and the outbound link carries `&t=421`.
+  `7:01` badge and the embed starts there.
 - share-tracking params like `si=` are **dropped**.
 
 Clicking a post's header expands its player in place, so several can be open at

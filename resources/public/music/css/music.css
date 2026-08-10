@@ -153,8 +153,6 @@ textarea:focus {
   margin-top: 12px;
   font-size: 0.85em;
 }
-.watch-link { color: var(--accent); text-decoration: none; }
-.watch-link:hover { text-decoration: underline; }
 .card-actions { display: flex; gap: 8px; margin-left: auto; }
 .card-actions button { padding: 6px 12px; font-size: 0.9em; }
 
