@@ -28,13 +28,21 @@
 (defn- entity-row [{:keys [id name]}]
   [:div.entity-row
    [:span.entity-name name]
-   [:button.secondary.danger {:on-click #(state/delete-entity id)} "Delete"]])
+   [:button.secondary.danger
+    {:on-click #(when (js/confirm (str "Delete entity \"" name
+                                       "\"? It comes off every post it is assigned to."))
+                  (state/delete-entity id))}
+    "Delete"]])
 
 (defn- category-block [{:keys [id name entities]}]
   [:div.category
    [:div.category-head
     [:h2.category-name name]
-    [:button.secondary.danger {:on-click #(state/delete-category id)} "Delete"]]
+    [:button.secondary.danger
+     {:on-click #(when (js/confirm (str "Delete category \"" name
+                                        "\"? Its entities go too, and come off every post."))
+                   (state/delete-category id))}
+     "Delete"]]
    (if (empty? entities)
      [:div.category-empty "No entities yet."]
      [:div.entity-rows
