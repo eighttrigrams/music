@@ -17,6 +17,7 @@
   feed to an entity and still see no chips on what comes back — intended."
   (:require [reagent.core :as r]
             [clojure.string :as str]
+            [et.mu.ui.codemirror :as cm]
             [et.mu.ui.state :as state]))
 
 (defn- embed-url [video-id start-seconds]
@@ -55,11 +56,12 @@
            :value @input
            :on-change #(reset! input (-> % .-target .-value))
            :on-key-down #(when (= (.-key %) "Enter") (submit))}]
-         [:textarea.compose-note
-          {:placeholder "Say something about it (optional)"
-           :rows 2
-           :value @note
-           :on-change #(reset! note (-> % .-target .-value))}]
+         ;; A CodeMirror with the IJKL scheme rather than a textarea; the height
+         ;; is what rows=2 measured, so the compose box keeps its proportions.
+         [cm/editor {:placeholder "Say something about it (optional)"
+                     :height "58px"
+                     :value @note
+                     :on-change #(reset! note %)}]
          [:button {:on-click submit :disabled (str/blank? @input)} "Post"]]))))
 
 (defn- entity-checkbox [{:keys [id name]} chosen on-toggle]
@@ -111,11 +113,12 @@
          [:div.modal {:on-click #(.stopPropagation %)}
           [:h2 "Annotate"]
           [:div.modal-subtitle (or (:title video) (:video_id video))]
-          [:textarea.modal-description
-           {:placeholder "A description, for your eyes only"
-            :rows 4
-            :value @description
-            :on-change #(reset! description (-> % .-target .-value))}]
+          ;; As in the compose box above. 94px is rows=4: the same 18px line the
+          ;; rows=2 textarea measured, plus its padding and border.
+          [cm/editor {:placeholder "A description, for your eyes only"
+                      :height "94px"
+                      :value @description
+                      :on-change #(reset! description %)}]
           (if (no-entities? categories)
             [no-vocabulary]
             [entity-groups categories @chosen #(swap! chosen toggle %)])
