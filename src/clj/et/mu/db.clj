@@ -78,5 +78,5 @@
   pointing at a row that is already gone."
   [ds]
   (let [conn (get-conn ds)]
-    (doseq [table [:video_entities :entities :categories :videos]]
+    (doseq [table [:video_entities :entities :categories :videos :projects]]
       (jdbc/execute-one! conn (sql/format {:delete-from table})))))

@@ -5,6 +5,7 @@
             [et.mu.server.user-handler :as user-handler]
             [et.mu.server.video-handler :as video-handler]
             [et.mu.server.category-handler :as category-handler]
+            [et.mu.server.project-handler :as project-handler]
             [et.mu.auth :as auth]
             [et.mu.server.recording-mode :as recording-mode]
             [et.mu.middleware.rate-limit :as rate-limit :refer [wrap-rate-limit]]
@@ -64,7 +65,8 @@
   '[et.mu.server
     et.mu.server.user-handler
     et.mu.server.video-handler
-    et.mu.server.category-handler])
+    et.mu.server.category-handler
+    et.mu.server.project-handler])
 
 (def ^:private route-doc-re
   "Route handlers document themselves as `METHOD /path — explanation`. Matching
@@ -134,6 +136,15 @@
 
     (context "/entities" []
       (DELETE "/:id" [] category-handler/delete-entity-handler))
+
+    ;; The one context whose GETs are the owner's too — the handlers ask for
+    ;; themselves, because wrap-auth below gates only the mutations.
+    (context "/projects" []
+      (GET    "/"    [] project-handler/list-projects-handler)
+      (POST   "/"    [] project-handler/add-project-handler)
+      (GET    "/:id" [] project-handler/get-project-handler)
+      (PUT    "/:id" [] project-handler/update-project-handler)
+      (DELETE "/:id" [] project-handler/delete-project-handler))
 
     (context "/test" []
       (POST "/reset" [] reset-test-db-handler))))

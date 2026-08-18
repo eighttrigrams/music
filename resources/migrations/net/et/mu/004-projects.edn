@@ -1,0 +1,14 @@
+;; The rollback drops notes the owner wrote by hand. Unlike the earlier
+;; migrations, whose :down loses an annotation that can be typed again in a
+;; minute, this one loses prose. Take a copy of the table before rolling back.
+{:up ["CREATE TABLE projects (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         title TEXT NOT NULL,
+         body TEXT NOT NULL DEFAULT '',
+         created_at DATETIME DEFAULT (datetime('now')),
+         modified_at DATETIME DEFAULT (datetime('now')),
+         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+       )"
+      "CREATE INDEX idx_projects_user ON projects (user_id)"]
+ :down ["DROP INDEX IF EXISTS idx_projects_user"
+        "DROP TABLE IF EXISTS projects"]}
