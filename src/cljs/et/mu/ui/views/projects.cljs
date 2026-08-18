@@ -1,5 +1,6 @@
 (ns et.mu.ui.views.projects
-  "Projects: the owner's notes, a title and a markdown body.
+  "Projects: the owner's notes — a title, a markdown body, and optionally one
+  audio file played in place between the two.
 
   The page is the odd one out in music, in the way that matters most: a post is
   public and cannot be edited, a project is private and is nothing but editable.
@@ -13,6 +14,7 @@
   render theirs."
   (:require [reagent.core :as r]
             [clojure.string :as str]
+            [et.mu.ui.audio :as audio]
             [et.mu.ui.codemirror :as cm]
             [et.mu.ui.markdown :as markdown]
             [et.mu.ui.state :as state]))
@@ -22,16 +24,20 @@
     (first (str/split (str timestamp) #" "))))
 
 (defn- compose-form
-  "A title and, if there is anything to say yet, a body. Only the title is
-  required — the server takes a note that is a title and nothing else."
+  "A title and, if there is anything to say yet, a body and an audio file. Only
+  the title is required — the server takes a note that is a title and nothing
+  else."
   []
   (let [title (r/atom "")
-        body (r/atom "")]
+        body (r/atom "")
+        audio-url (r/atom "")]
     (fn []
       (let [submit (fn []
                      (when-not (str/blank? @title)
-                       (state/add-project @title @body
-                                          (fn [] (reset! title "") (reset! body "")))))]
+                       (state/add-project @title @body @audio-url
+                                          (fn [] (reset! title "")
+                                                 (reset! body "")
+                                                 (reset! audio-url "")))))]
         [:div.compose
          [:input.compose-url
           {:type "text" :placeholder "Project title"
@@ -39,6 +45,15 @@
            :on-change #(reset! title (-> % .-target .-value))
            ;; Enter submits from the title, as in the compose box on the feed.
            ;; Not from the body: a newline is what Enter means in markdown.
+           :on-key-down #(when (= (.-key %) "Enter") (submit))}]
+         ;; `type="url"` for the keyboard it brings up on a phone, not for
+         ;; validation: what counts as an acceptable link is the server's call
+         ;; and depends on whether this is dev or production, which the browser
+         ;; has no way to know.
+         [:input.compose-url
+          {:type "url" :placeholder "Audio URL — an mp3 to play here (optional)"
+           :value @audio-url
+           :on-change #(reset! audio-url (-> % .-target .-value))
            :on-key-down #(when (= (.-key %) "Enter") (submit))}]
          [cm/editor {:placeholder "Markdown (optional)"
                      :height "94px"
@@ -92,10 +107,14 @@
   (r/with-let [project-id (:id project)
                initial-title (or (:title project) "")
                initial-body (or (:body project) "")
+               initial-audio (or (:audio_url project) "")
                title (r/atom initial-title)
                body (r/atom initial-body)
+               audio-url (r/atom initial-audio)
                confirming? (r/atom false)
-               dirty? #(or (not= @title initial-title) (not= @body initial-body))
+               dirty? #(or (not= @title initial-title)
+                           (not= @body initial-body)
+                           (not= @audio-url initial-audio))
                ;; The row as the list now holds it, not as the modal opened it:
                ;; after a refused save that is the version that landed, and its
                ;; `modified_at` is the one a second save has to carry.
@@ -103,7 +122,7 @@
                                           (:projects @state/*app-state)))
                            project)
                save! #(when-not (str/blank? @title)
-                        (state/save-project project-id @title @body
+                        (state/save-project project-id @title @body @audio-url
                                             (:modified_at (latest))
                                             state/stop-editing-project))
                leave! #(if (dirty?)
@@ -133,6 +152,13 @@
         :value @title
         :on-change #(reset! title (-> % .-target .-value))
         :on-key-down #(when (= (.-key %) "Enter") (save!))}]
+      ;; Emptying this is how the player comes off the note again — the server
+      ;; treats a blank `audio_url` as a clear rather than as nothing sent.
+      [:input.modal-audio-url
+       {:type "url" :placeholder "Audio URL — an mp3 to play here (optional)"
+        :value @audio-url
+        :on-change #(reset! audio-url (-> % .-target .-value))
+        :on-key-down #(when (= (.-key %) "Enter") (save!))}]
       ;; The editor takes whatever the title and the buttons leave, rather
       ;; than a height of its own: the modal is a share of the window, so a
       ;; fixed one would either fall short of it or overrun it.
@@ -151,11 +177,17 @@
     (finally
       (.removeEventListener js/document "keydown" on-key true))))
 
-(defn- project-card [{:keys [id title body created_at]}]
+(defn- project-card [{:keys [id title body audio_url created_at]}]
   [:div.card.project
    [:div.project-head
     [:h2.project-title title]
     [:span.card-date (day created_at)]]
+   ;; Between the title and the prose, because that is the order they are read
+   ;; in: what this note is, then what it sounds like, then what is said about
+   ;; it. Keyed on the URL so editing the link builds a new player rather than
+   ;; handing the old one a different file mid-play.
+   (when (seq audio_url)
+     ^{:key audio_url} [audio/player audio_url])
    (when (seq body)
      [:div.project-body [markdown/render body]])
    [:div.card-footer

@@ -228,20 +228,30 @@
     (api/fetch-json "/api/projects" (auth-headers)
       (fn [projects] (swap! *app-state assoc :projects (vec projects))))))
 
-(defn add-project [title body on-success]
-  (api/post-json "/api/projects" {:title title :body (or body "")} (auth-headers)
+(defn add-project [title body audio-url on-success]
+  (api/post-json "/api/projects"
+                 {:title title :body (or body "") :audio_url (or audio-url "")}
+                 (auth-headers)
     (fn [_] (fetch-projects) (when on-success (on-success)))
+    ;; `err-handler` already prefers the server's own message, which is what
+    ;; carries a refused audio URL back to the person who pasted it.
     (err-handler "Could not create that project")))
 
 (defn save-project
-  "The title and the body, and the `modified_at` they were read at — that last
-  one is what turns a save that would land on somebody else's into a 409. The
-  editor is left open when it does, draft and all, and only the list underneath
-  is refreshed: the client's job here is to not lose either version, not to pick
-  between them."
-  [id title body modified-at on-success]
+  "The title, the body and the audio URL, and the `modified_at` they were read at
+  — that last one is what turns a save that would land on somebody else's into a
+  409. The editor is left open when it does, draft and all, and only the list
+  underneath is refreshed: the client's job here is to not lose either version,
+  not to pick between them.
+
+  The audio URL always rides along, blank included: blank is how the player is
+  taken off the note, so it has to be sent rather than omitted."
+  [id title body audio-url modified-at on-success]
   (api/put-json (str "/api/projects/" id)
-                {:title title :body (or body "") :modified_at modified-at}
+                {:title title
+                 :body (or body "")
+                 :audio_url (or audio-url "")
+                 :modified_at modified-at}
                 (auth-headers)
     (fn [_] (fetch-projects) (when on-success (on-success)))
     (fn [resp]

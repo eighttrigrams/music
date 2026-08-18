@@ -398,9 +398,109 @@ textarea:focus {
 
 .project-body { margin-top: 10px; font-size: 0.95em; }
 
+/* --------------------------------------------------------------------------
+   the audio player on a project
+
+   SoundCloud minus the waveform, sitting between the title and the prose: a
+   play circle, a bar, and the position against the length. A pill rather than a
+   panel, because it is one line of controls inside a card that is already a
+   glass box — a second box would read as a card within a card. */
+
+.audio-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 7px 12px 7px 7px;
+  border-radius: 999px;
+  background: var(--glass-bg-subtle);
+  border: 1px solid var(--glass-border);
+}
+
+/* The element itself is only the machinery — every control on screen is ours.
+   The HTML spec's own sheet hides a controls-less <audio> already; saying it
+   here means it is never a stray flex item if that ever changes. */
+.audio-player audio { display: none; }
+
+.audio-toggle {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0.62em;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The glyphs are ▶ and ❚❚, and the triangle's own bearing sits it visibly
+     left of centre in a circle. A nudge rather than an icon font. */
+  text-indent: 1px;
+}
+/* The lift the shared button:hover rule gives would bob the whole row, since
+   everything beside it is centred on this circle. */
+.audio-toggle:hover { transform: none; }
+.audio-toggle:disabled { opacity: 0.5; cursor: default; }
+
+.audio-time {
+  flex: none;
+  font-size: 0.78em;
+  color: var(--text-secondary);
+  /* So the row does not twitch as the digits change under it. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* The bar is a range input and not a div, so dragging, clicking anywhere along
+   it and the arrow keys all come for free. What is styled away is only its
+   appearance: the played part is a gradient over the track, cut at the
+   `--played` the component sets, rather than a second element on top. */
+.audio-seek {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background: linear-gradient(to right,
+              var(--accent) 0 var(--played, 0%),
+              var(--border-color) var(--played, 0%) 100%);
+}
+.audio-seek::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+.audio-seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+/* Until the length is known there is nothing to seek along. */
+.audio-seek:disabled { cursor: default; opacity: 0.45; }
+.audio-seek:disabled::-webkit-slider-thumb { visibility: hidden; }
+.audio-seek:disabled::-moz-range-thumb { visibility: hidden; }
+
+.audio-failed {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8em;
+  color: var(--text-secondary);
+}
+
 /* The modal's own title line, which the annotate modal has no use for: there
    the title belongs to the post and is not editable. */
-.modal-title { width: 100%; }
+.modal-title, .modal-audio-url { width: 100%; }
 
 /* Editing a note is the one thing in music worth the whole window: four fifths
    of it in both directions, rather than the 460px column the annotate modal
