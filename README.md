@@ -12,6 +12,10 @@ post: a private **description**, and any number of **entities** the post is
 assigned to. `PUT /api/videos/:id` writes that layer and only that layer. See
 [The annotation layer](#the-annotation-layer).
 
+Beside the feed sits one page that is not public at all: **Projects**, the
+owner's own notes in markdown, which unlike a post are there to be rewritten.
+See [Projects](#projects).
+
 A post is made by pasting whatever is at hand: a watch URL, a `youtu.be` share
 link, an `/embed/`, `/shorts/` or `/live/` URL, or the bare 11-character id. The
 server resolves the id and asks YouTube's public oEmbed endpoint for the title,
@@ -59,6 +63,42 @@ what stay gated. "Authenticated" here means a valid Bearer token or dev
 skip-logins — note `wrap-auth` only gates *mutating* requests, so read visibility
 is decided in the handler and db layers. A machine token (`:machine? true`)
 verifies like any other and therefore sees everything, which is intended.
+
+## Projects
+
+Beside the feed there is one page that is not public at all. A **project** is a
+note the owner keeps — a title and a markdown body — on a Projects page reachable
+from the top bar, next to Categories.
+
+It is the mirror image of a post. A post is public and **immutable**; a project
+is **private and nothing but editable**. So the two affordances the feed refuses
+are here: Edit opens the note itself rather than a layer beside it, and there is
+no anonymous half of the page to fall back to.
+
+Where the annotation layer is hidden by *shape* — an anonymous `GET /api/videos`
+simply lacks the keys — `/api/projects` is refused outright: every route of it,
+the GETs included, answers an anonymous caller `401 {"error":"Authentication
+required"}`, the same body `wrap-auth` gives. Signing out drops the notes from
+the client too, rather than only navigating away from them. An id belonging to
+somebody else is a `404` identical to one belonging to nobody, because a `403`
+would confirm the note is there and let a stranger count them by walking ids.
+
+Editing is what finally gives `modified_at` something to do. A `PUT` may carry
+the `modified_at` it read, and a save landing on a version written in between is
+refused with `409` carrying the current row — the editor keeps the draft and
+shows what it would have overwritten, and saving again then goes through
+deliberately. The guard exists so that nobody's writing disappears unseen, not to
+decide which version wins.
+
+The modal is four fifths of the window and can only be left through its own
+buttons: ⌘9 saves and closes, Escape closes, and either one asks first when there
+are unsaved edits. There is no dismiss-on-backdrop — the nearest miss of a
+full-window editor is the backdrop, and a stray click is a poor way to lose
+prose.
+
+The body is rendered with `marked`, as in tracker and treina, and written in the
+same IJKL CodeMirror as the compose box. A post's note and description stay plain
+text: markdown is the projects page's, not the feed's.
 
 ## Hosting
 
@@ -117,6 +157,17 @@ this connection, so `ON DELETE CASCADE` would be a promise nothing keeps.
 Dropping a video, an entity or a category takes the `video_entities` rows it
 orphans with it.
 
+The projects page adds a context of its own, and it is the only one where a
+`GET` is gated as well as a write — see [Projects](#projects):
+
+- `GET /api/projects`, `GET /api/projects/:id` — the caller's own, newest first.
+- `POST /api/projects` `{:title :body}` — the title is required, the markdown
+  body optional.
+- `PUT /api/projects/:id` `{:title :body :modified_at}` — a field left out keeps
+  its value; `modified_at` is the optimistic-concurrency guard and may be left
+  out for last-write-wins.
+- `DELETE /api/projects/:id`
+
 ### Read-only by default for machine callers
 
 A token from `et.mu.auth/create-machine-token` is marked `:machine? true`. Such a
@@ -143,6 +194,7 @@ production, 720 in dev. Override with `RATE_LIMIT_MAX_REQUESTS` and
   ragtime migrations in `resources/migrations/net/et/mu`. `youtube.clj` holds the
   URL→id resolution, the `t=` offset parsing and the oEmbed title lookup.
 - `src/cljs/et/mu/ui` — reagent SPA (`core`, `state`, `views/videos`,
-  `views/categories`).
+  `views/categories`, `views/projects`; `markdown.cljs` is the `marked` wrapper).
 - `resources/public/music` — `index.html`, `styles.css`, `css/` (teal theme in
-  `base.css`, app layout in `music.css`, phone rules last in `mobile.css`).
+  `base.css`, app layout in `music.css`, rendered markdown in `markdown.css`,
+  phone rules last in `mobile.css`).
