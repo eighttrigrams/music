@@ -160,3 +160,83 @@
                    ["PUT" "/api/projects/:id"]
                    ["DELETE" "/api/projects/:id"]]]
       (is (contains? paths route)))))
+
+(deftest an-audio-url-rides-along-with-the-note
+  (let [mp3 "https://files.example.com/take-3.mp3"
+        created (POST-json "/api/projects" {:title "Take 3" :body "flat in bar 9"
+                                            :audio_url mp3})
+        id (:id (:body created))]
+    (is (= 201 (:status created)))
+    (is (= mp3 (:audio_url (:body created))))
+    (testing "and comes back on both reads, since the player is drawn from the list"
+      (is (= [mp3] (map :audio_url (:body (GET-json "/api/projects")))))
+      (is (= mp3 (:audio_url (:body (GET-json (str "/api/projects/" id)))))))
+    (testing "a note made without one reads as empty, never nil"
+      (is (= "" (:audio_url (:body (POST-json "/api/projects" {:title "No audio"}))))))
+    (testing "swapped for another"
+      (let [other "https://files.example.com/take-4.mp3"]
+        (is (= other (:audio_url (:body (PUT-json (str "/api/projects/" id)
+                                                  {:audio_url other})))))))
+    (testing "blank takes the player off the note again, rather than being ignored"
+      (is (= "" (:audio_url (:body (PUT-json (str "/api/projects/" id)
+                                             {:audio_url ""})))))
+      (is (= "" (:audio_url (:body (GET-json (str "/api/projects/" id)))))))
+    (testing "and it is a field like the others: left out, it keeps what it had"
+      (PUT-json (str "/api/projects/" id) {:audio_url mp3})
+      (is (= mp3 (:audio_url (:body (PUT-json (str "/api/projects/" id)
+                                              {:title "Take 3, mixed"})))))
+      (is (= "Take 3, mixed" (:title (:body (GET-json (str "/api/projects/" id)))))))
+    (testing "carried alone it is still something to save, not a bare timestamp bump"
+      (is (= 200 (:status (PUT-json (str "/api/projects/" id) {:audio_url mp3})))))))
+
+(deftest only-a-link-a-browser-could-fetch-gets-in
+  (let [id (:id (project! "Host" ""))
+        refused (fn [value]
+                  (testing (str "refused: " (pr-str value))
+                    (is (= 400 (:status (POST-json "/api/projects"
+                                                   {:title "x" :audio_url value}))))
+                    (is (= 400 (:status (PUT-json (str "/api/projects/" id)
+                                                  {:audio_url value}))))))]
+    (doseq [value ["files.example.com/take.mp3"     ;; no scheme: relative, not a link
+                   "/take.mp3"
+                   "ftp://files.example.com/take.mp3"
+                   "file:///Users/dan/take.mp3"
+                   "javascript:alert(1)"            ;; never into an <audio src>
+                   "data:audio/mpeg;base64,AAAA"
+                   "http://"                        ;; a scheme and no host
+                   "https://"
+                   "ht tp://files.example.com/x"    ;; will not parse at all
+                   42
+                   {:url "https://files.example.com/x.mp3"}
+                   ["https://files.example.com/x.mp3"]]]
+      (refused value))
+    (testing "and none of it was written"
+      (is (= "" (:audio_url (:body (GET-json (str "/api/projects/" id))))))
+      (is (= ["Host"] (map :title (:body (GET-json "/api/projects"))))))))
+
+(deftest http-is-a-dev-convenience-and-production-takes-https-only
+  (let [plain "http://localhost:8000/take.mp3"
+        id (:id (project! "Host" ""))]
+    (testing "in dev it goes through — the page is plain http too, so it plays"
+      (is (= 201 (:status (POST-json "/api/projects" {:title "Local"
+                                                      :audio_url plain}))))
+      (is (= plain (:audio_url (:body (PUT-json (str "/api/projects/" id)
+                                                {:audio_url plain}))))))
+    (testing "in production it is refused: an https page cannot play http audio"
+      (with-prod-app
+        (let [token (token-for *user-id*)
+              post (fn [body] (API :post "/api/projects" {:token token :body body}))
+              put (fn [body] (API :put (str "/api/projects/" id) {:token token :body body}))]
+          (is (= 400 (:status (post {:title "Local" :audio_url plain}))))
+          (is (= "Audio URL must be https" (:error (:body (post {:title "Local"
+                                                                :audio_url plain})))))
+          (is (= 400 (:status (put {:audio_url plain}))))
+          (testing "https is what it wants, and blank is still how it is cleared"
+            (is (= 201 (:status (post {:title "Remote"
+                                       :audio_url "https://files.example.com/x.mp3"}))))
+            (is (= "" (:audio_url (:body (put {:audio_url ""}))))))
+          (testing "and the http one that was already there is left alone until touched"
+            (is (= 200 (:status (put {:title "Host, renamed"}))))))))
+    (testing "back in dev the stored http link still reads back"
+      (is (= plain (:audio_url (:body (PUT-json (str "/api/projects/" id)
+                                                {:audio_url plain}))))))))

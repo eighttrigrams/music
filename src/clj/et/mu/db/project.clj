@@ -1,5 +1,6 @@
 (ns et.mu.db.project
-  "A project: a note the owner keeps, a title and a markdown body.
+  "A project: a note the owner keeps — a title, a markdown body, and optionally
+  the URL of one audio file to play beside it.
 
   Nothing else in music is like this. A post is public and immutable; a project
   is **private and editable**, and both halves of that sentence show up here.
@@ -22,7 +23,7 @@
             [taoensso.telemere :as tel]
             [et.mu.db :as db]))
 
-(def select-columns [:id :title :body :created_at :modified_at])
+(def select-columns [:id :title :body :audio_url :created_at :modified_at])
 
 (def ^:private now [:datetime "now"])
 
@@ -55,11 +56,12 @@
                  :where (owned id user-id)})
     db/jdbc-opts))
 
-(defn add-project [ds user-id {:keys [title body]}]
+(defn add-project [ds user-id {:keys [title body audio_url]}]
   (let [result (jdbc/execute-one! (db/get-conn ds)
                  (sql/format {:insert-into :projects
                               :values [{:title title
                                         :body (or body "")
+                                        :audio_url (or audio_url "")
                                         :user_id user-id}]
                               :returning select-columns})
                  db/jdbc-opts)]

@@ -1,0 +1,10 @@
+;; A project may name one audio file to be played beside the note — an mp3
+;; sitting on some web server, not something this app hosts. Only the URL is
+;; kept, so the rollback loses a link that can be pasted again, not prose. That
+;; makes this one safe to run, unlike 004 above it.
+;;
+;; NOT NULL with a default rather than a nullable column: every other text
+;; column on this table reads as a string or an empty one, never nil, and the
+;; player has one less case to answer for.
+{:up ["ALTER TABLE projects ADD COLUMN audio_url TEXT NOT NULL DEFAULT ''"]
+ :down ["ALTER TABLE projects DROP COLUMN audio_url"]}
