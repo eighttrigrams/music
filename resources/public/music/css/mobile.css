@@ -14,6 +14,9 @@
   .filter-panel { width: min(84vw, 300px); }
   .modal-backdrop { padding: 12px; align-items: flex-start; }
   .modal { margin-top: 12px; }
+  /* 80% of a phone is a column too narrow to write in, and the 20% left over
+     is backdrop nobody wanted. The height stays as the desktop asked for it. */
+  .project-modal { width: 100%; max-width: 100%; }
   .category { padding: 14px; }
   .add-category { flex-wrap: wrap; }
   .add-category input, .add-entity input { max-width: none; }

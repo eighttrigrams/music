@@ -378,3 +378,73 @@ textarea:focus {
   border-top: 1px solid var(--border-color);
 }
 .entity-name { flex: 1; font-size: 0.92em; }
+
+/* --------------------------------------------------------------------------
+   the projects page
+
+   A project reuses the feed's card, because a note and a post want the same
+   glass box; what it does not reuse is the header, which on a card is a button
+   that expands a player. There is nothing to expand here. */
+
+.projects .compose input { width: 100%; }
+
+.project-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.project-title { flex: 1; }
+
+.project-body { margin-top: 10px; font-size: 0.95em; }
+
+/* The modal's own title line, which the annotate modal has no use for: there
+   the title belongs to the post and is not editable. */
+.modal-title { width: 100%; }
+
+/* Editing a note is the one thing in music worth the whole window: four fifths
+   of it in both directions, rather than the 460px column the annotate modal
+   sits in. `max-width` has to be overridden too — the shared rule caps it. */
+.project-modal {
+  width: 80vw;
+  max-width: 80vw;
+  height: 80vh;
+  max-height: 80vh;
+}
+/* The editor takes what is left over. `min-height: 0` is what lets it: without
+   it a flex item refuses to shrink below its content, and a long note would
+   push the buttons off the bottom instead of scrolling inside the editor. */
+.project-modal .project-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Asking before a draft is lost. Above the editing modal rather than inside it,
+   so the note stays visible behind the question being asked about it. */
+.confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.confirm-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+  background: var(--glass-bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+.confirm-text { color: var(--text-secondary); font-size: 0.9em; }
