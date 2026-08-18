@@ -67,8 +67,9 @@ verifies like any other and therefore sees everything, which is intended.
 ## Projects
 
 Beside the feed there is one page that is not public at all. A **project** is a
-note the owner keeps — a title and a markdown body — on a Projects page reachable
-from the top bar, next to Categories.
+note the owner keeps — a title, a markdown body, and optionally one audio file
+played in place between them — on a Projects page reachable from the top bar,
+next to Categories.
 
 It is the mirror image of a post. A post is public and **immutable**; a project
 is **private and nothing but editable**. So the two affordances the feed refuses
@@ -99,6 +100,40 @@ prose.
 The body is rendered with `marked`, as in tracker and treina, and written in the
 same IJKL CodeMirror as the compose box. A post's note and description stay plain
 text: markdown is the projects page's, not the feed's.
+
+### The player
+
+A project may carry an `audio_url`: one audio file — an mp3 sitting on some web
+server — played on the overview, between the title and the prose. That is the
+reading order it follows: what this note is, then what it sounds like, then what
+is said about it. Only the URL is stored; music hosts nothing.
+
+The player is SoundCloud minus the waveform — a play/pause circle, a bar that can
+be dragged, clicked or arrowed along, and the position against the length. **No
+waveform on purpose:** drawing one means fetching and decoding the whole file
+before a note can even be heard, and what is played here is somebody else's file
+across the internet. `preload="metadata"` asks for the length and nothing more, so
+a page of notes costs a handful of small requests rather than a download each.
+
+Seeking mid-file needs the far end to answer HTTP range requests. Most do; one
+that does not still plays from the start, and dragging the bar simply lands back
+where it was — a failed seek is not treated as an error. A file that cannot be
+played at all replaces the bar with a link to open it directly, which is the
+useful offer when it is your own URL that has moved.
+
+The link is **`http(s)` only, and in production `https` only.** Not fussiness:
+the production page is served over TLS, so a plain `http` audio file is blocked
+by the browser as mixed content, and a link that could never play is better
+refused at the door than stored. In dev the page is plain `http` too, so `http`
+goes through and a file on a local server can be pointed at. `file:`,
+`javascript:`, `data:` and a scheme-less path are refused everywhere — the value
+is handed to an `<audio src>`, and that is not a field to park a URL scheme in.
+The server decides all of this, not the browser: only the server knows which
+deployment it is.
+
+`audio_url` is a field like the others on a `PUT` — left out it keeps its value —
+with one difference: **blank is a clear, not an omission.** Emptying the box in
+the modal is how the player comes off a note again.
 
 ## Hosting
 
@@ -161,11 +196,13 @@ The projects page adds a context of its own, and it is the only one where a
 `GET` is gated as well as a write — see [Projects](#projects):
 
 - `GET /api/projects`, `GET /api/projects/:id` — the caller's own, newest first.
-- `POST /api/projects` `{:title :body}` — the title is required, the markdown
-  body optional.
-- `PUT /api/projects/:id` `{:title :body :modified_at}` — a field left out keeps
-  its value; `modified_at` is the optimistic-concurrency guard and may be left
-  out for last-write-wins.
+- `POST /api/projects` `{:title :body :audio_url}` — the title is required, the
+  markdown body and the audio URL optional.
+- `PUT /api/projects/:id` `{:title :body :audio_url :modified_at}` — a field left
+  out keeps its value, except that a blank `audio_url` clears it;
+  `modified_at` is the optimistic-concurrency guard and may be left out for
+  last-write-wins. A non-blank `audio_url` that is not an `http(s)` URL — or is
+  `http` in production — is a `400`.
 - `DELETE /api/projects/:id`
 
 ### Read-only by default for machine callers
@@ -194,7 +231,8 @@ production, 720 in dev. Override with `RATE_LIMIT_MAX_REQUESTS` and
   ragtime migrations in `resources/migrations/net/et/mu`. `youtube.clj` holds the
   URL→id resolution, the `t=` offset parsing and the oEmbed title lookup.
 - `src/cljs/et/mu/ui` — reagent SPA (`core`, `state`, `views/videos`,
-  `views/categories`, `views/projects`; `markdown.cljs` is the `marked` wrapper).
+  `views/categories`, `views/projects`; `markdown.cljs` is the `marked` wrapper
+  and `audio.cljs` the project player).
 - `resources/public/music` — `index.html`, `styles.css`, `css/` (teal theme in
   `base.css`, app layout in `music.css`, rendered markdown in `markdown.css`,
   phone rules last in `mobile.css`).
