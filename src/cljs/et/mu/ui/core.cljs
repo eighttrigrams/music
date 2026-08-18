@@ -3,7 +3,8 @@
             [reagent.core :as r]
             [et.mu.ui.state :as state]
             [et.mu.ui.views.videos :as videos]
-            [et.mu.ui.views.categories :as categories]))
+            [et.mu.ui.views.categories :as categories]
+            [et.mu.ui.views.projects :as projects]))
 
 (defn login-form []
   (let [username (r/atom "")
@@ -30,7 +31,9 @@
    [:button.page-link {:class (when (= page :feed) "active")
                        :on-click #(state/set-page :feed)} "Feed"]
    [:button.page-link {:class (when (= page :categories) "active")
-                       :on-click #(state/set-page :categories)} "Categories"]])
+                       :on-click #(state/set-page :categories)} "Categories"]
+   [:button.page-link {:class (when (= page :projects) "active")
+                       :on-click #(state/set-page :projects)} "Projects"]])
 
 (defn- top-bar []
   (let [{:keys [auth-required? logged-in? show-login? dark-mode page]} @state/*app-state]
@@ -62,9 +65,14 @@
        (when (and auth-required? (not logged-in?) show-login?)
          [login-form])
        [:div.main-layout
-        (if (and logged-in? (= page :categories))
-          [categories/categories-tab]
-          [videos/videos-tab])]])))
+        ;; `logged-in?` is asked again here rather than trusted from the nav:
+        ;; signing out sets the page back to the feed, and this is what makes
+        ;; that one line's failing not enough to show a private page.
+        (cond
+          (not logged-in?) [videos/videos-tab]
+          (= page :categories) [categories/categories-tab]
+          (= page :projects) [projects/projects-tab]
+          :else [videos/videos-tab])]])))
 
 (defonce root (rdomc/create-root (.getElementById js/document "app")))
 

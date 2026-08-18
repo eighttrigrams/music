@@ -26,11 +26,13 @@
            :show-login? false    ;; the sign-in form is only asked for
            :dark-mode (initial-dark-mode)
            :open #{}             ;; ids of posts whose player is expanded
-           :page :feed           ;; :feed or :categories
+           :page :feed           ;; :feed, :categories or :projects
            :categories []        ;; the owner's vocabulary, entities nested
            :filter-entities #{}  ;; entity ids the feed is narrowed to
            :videos-request 0     ;; only the newest feed request may land
-           :editing nil}))       ;; id of the post whose Edit modal is open
+           :editing nil          ;; id of the post whose Edit modal is open
+           :projects []          ;; the owner's notes — never fetched anonymously
+           :editing-project nil})) ;; id of the project whose Edit modal is open
 
 ;; ---------------------------------------------------------------------------
 ;; helpers
@@ -63,6 +65,7 @@
 
 (declare fetch-videos)
 (declare fetch-categories)
+(declare fetch-projects)
 
 (defn fetch-auth-required
   "Reading is public, so the feed and the vocabulary behind the filter are fetched
@@ -81,7 +84,8 @@
                    :token token
                    :current-user (js->clj (js/JSON.parse user-str) :keywordize-keys true)))))
       (fetch-videos)
-      (fetch-categories))))
+      (fetch-categories)
+      (fetch-projects))))
 
 (defn login [username password on-success]
   (api/post-json "/api/auth/login" {:username username :password password} {}
@@ -90,6 +94,7 @@
       (save-token! token user)
       (fetch-videos)
       (fetch-categories)
+      (fetch-projects)
       (when on-success (on-success)))
     (err-handler "Invalid credentials")))
 
@@ -99,12 +104,18 @@
   entities, and the Edit modal built on top of them is dropped. The feed goes with
   them in the same swap, or the annotated payload stays on screen for the whole
   round-trip. The vocabulary and whatever it is narrowed to are public, so they
-  stay — signing out narrows the same feed as before, minus the chips."
+  stay — signing out narrows the same feed as before, minus the chips.
+
+  The projects go in that same swap, and unlike the feed they are not fetched
+  again: they have no anonymous shape to come back in. Dropping them is not
+  tidiness. `:page :feed` takes the page away, but the notes themselves would
+  still be sitting in the atom for anyone who opened a console."
   []
   (clear-token!)
   (swap! *app-state assoc
          :logged-in? false :token nil :current-user nil
-         :page :feed :editing nil :videos [])
+         :page :feed :editing nil :videos []
+         :projects [] :editing-project nil)
   (fetch-videos))
 
 ;; ---------------------------------------------------------------------------
@@ -205,6 +216,48 @@
       (err-handler "Could not delete"))))
 
 ;; ---------------------------------------------------------------------------
+;; projects
+;;
+;; The one private page. Everything above is fetched whether or not anybody is
+;; signed in, because the server answers a visitor with a public shape of it.
+;; There is no such shape here: an anonymous GET is a 401, so asking while
+;; signed out would buy an error banner and nothing else.
+
+(defn fetch-projects []
+  (when (:logged-in? @*app-state)
+    (api/fetch-json "/api/projects" (auth-headers)
+      (fn [projects] (swap! *app-state assoc :projects (vec projects))))))
+
+(defn add-project [title body on-success]
+  (api/post-json "/api/projects" {:title title :body (or body "")} (auth-headers)
+    (fn [_] (fetch-projects) (when on-success (on-success)))
+    (err-handler "Could not create that project")))
+
+(defn save-project
+  "The title and the body, and the `modified_at` they were read at — that last
+  one is what turns a save that would land on somebody else's into a 409. The
+  editor is left open when it does, draft and all, and only the list underneath
+  is refreshed: the client's job here is to not lose either version, not to pick
+  between them."
+  [id title body modified-at on-success]
+  (api/put-json (str "/api/projects/" id)
+                {:title title :body (or body "") :modified_at modified-at}
+                (auth-headers)
+    (fn [_] (fetch-projects) (when on-success (on-success)))
+    (fn [resp]
+      (if (= 409 (:status resp))
+        (do (set-error (str "This project was saved somewhere else while you were "
+                            "writing. Your text is still here — copy what you need, "
+                            "then cancel to see the version that landed."))
+            (fetch-projects))
+        (set-error (get-in resp [:response :error] "Could not save"))))))
+
+(defn delete-project [id]
+  (api/delete-simple (str "/api/projects/" id) (auth-headers)
+    (fn [_] (fetch-projects))
+    (err-handler "Could not delete")))
+
+;; ---------------------------------------------------------------------------
 ;; the entity filter
 
 (defn toggle-filter-entity [id]
@@ -231,6 +284,12 @@
 
 (defn stop-editing []
   (swap! *app-state assoc :editing nil))
+
+(defn start-editing-project [id]
+  (swap! *app-state assoc :editing-project id))
+
+(defn stop-editing-project []
+  (swap! *app-state assoc :editing-project nil))
 
 ;; ---------------------------------------------------------------------------
 ;; dark mode
