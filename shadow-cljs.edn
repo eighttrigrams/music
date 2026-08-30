@@ -1,4 +1,11 @@
-{:source-paths ["src/cljs"]
+;; "../corvo/src/lib" is the *code* road for Corvo: this build compiles
+;; net.eighttrigrams.corvo.app straight from source, so Corvo ships no
+;; JavaScript into music. No new :dependencies — Corvo needs only reagent, and
+;; it is already declared below at the same version it pins (2.0.1); if those
+;; two ever disagree, nothing here will catch it.
+;; The *assets* come the other road, {:local/root "../corvo"} in deps.edn.
+;; Both lines have to move together if corvo moves.
+{:source-paths ["src/cljs" "../corvo/src/lib"]
  :dependencies [[reagent "2.0.1"]
                 [cljs-ajax "0.8.4"]]
  :http {:port #shadow/env ["SHADOW_PORT" :as :int :default 9806]}

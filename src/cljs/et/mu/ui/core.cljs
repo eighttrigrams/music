@@ -4,7 +4,9 @@
             [et.mu.ui.state :as state]
             [et.mu.ui.views.videos :as videos]
             [et.mu.ui.views.categories :as categories]
-            [et.mu.ui.views.projects :as projects]))
+            [et.mu.ui.views.projects :as projects]
+            ;; Compiled from source off "../corvo/src/lib" on :source-paths.
+            [net.eighttrigrams.corvo.app :as corvo]))
 
 (defn login-form []
   (let [username (r/atom "")
@@ -33,7 +35,20 @@
    [:button.page-link {:class (when (= page :categories) "active")
                        :on-click #(state/set-page :categories)} "Categories"]
    [:button.page-link {:class (when (= page :projects) "active")
-                       :on-click #(state/set-page :projects)} "Projects"]])
+                       :on-click #(state/set-page :projects)} "Projects"]
+   [:button.page-link {:class (when (= page :corvo) "active")
+                       :on-click #(state/set-page :corvo)} "Chords"]])
+
+(defn- public-nav
+  "The pages anyone may see. Corvo is public, so its link has to be reachable
+  signed out — but Categories and Projects are the owner's alone, so this is a
+  short separate list rather than page-nav shown to everyone."
+  [page]
+  [:div.page-nav
+   [:button.page-link {:class (when (not= page :corvo) "active")
+                       :on-click #(state/set-page :feed)} "Feed"]
+   [:button.page-link {:class (when (= page :corvo) "active")
+                       :on-click #(state/set-page :corvo)} "Chords"]])
 
 (defn- top-bar []
   (let [{:keys [auth-required? logged-in? show-login? dark-mode page]} @state/*app-state]
@@ -43,6 +58,9 @@
       [:span.brand-name "Music"]]
      [:div.top-bar-right
       (when logged-in? [page-nav page])
+      ;; Added rather than folded into the line above, so the signed-in path is
+      ;; exactly what it was.
+      (when-not logged-in? [public-nav page])
       [:button.dark-mode-toggle
        {:on-click state/toggle-dark-mode
         :title (if dark-mode "Switch to light" "Switch to dark")}
@@ -69,6 +87,9 @@
         ;; signing out sets the page back to the feed, and this is what makes
         ;; that one line's failing not enough to show a private page.
         (cond
+          ;; Corvo is public: an explicit allow *above* the check, so the
+          ;; invariant the comment describes is untouched for every other page.
+          (= page :corvo) [corvo/app]
           (not logged-in?) [videos/videos-tab]
           (= page :categories) [categories/categories-tab]
           (= page :projects) [projects/projects-tab]

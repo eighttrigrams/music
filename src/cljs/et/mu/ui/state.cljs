@@ -26,7 +26,7 @@
            :show-login? false    ;; the sign-in form is only asked for
            :dark-mode (initial-dark-mode)
            :open #{}             ;; ids of posts whose player is expanded
-           :page :feed           ;; :feed, :categories or :projects
+           :page :feed           ;; :feed, :categories, :projects or :corvo
            :categories []        ;; the owner's vocabulary, entities nested
            :filter-entities #{}  ;; entity ids the feed is narrowed to
            :videos-request 0     ;; only the newest feed request may land

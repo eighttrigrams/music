@@ -154,6 +154,11 @@
   (GET "/" [] serve-index)
   (GET "/styles.css" [] serve-styles)
   (route/resources "/" {:root "public/music"})
+  ;; Corvo's assets, off the classpath via {:local/root "../corvo"} in deps.edn.
+  ;; A second route and not a widening of the one above: that one is rooted at
+  ;; public/music and so cannot see public/corvo. Public, like the rest of the
+  ;; static tree — wrap-auth gates only mutating /api requests.
+  (route/resources "/corvo" {:root "public/corvo"})
   (route/not-found {:status 404 :body {:error "Not found"}}))
 
 (defn- mutating-request? [req]

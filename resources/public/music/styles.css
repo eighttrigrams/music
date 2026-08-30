@@ -1,5 +1,9 @@
 @import url('css/base.css?v=__CACHE_BUST__');
 @import url('css/music.css?v=__CACHE_BUST__');
 @import url('css/markdown.css?v=__CACHE_BUST__');
+/* Absolute, unlike its neighbours: they resolve against /styles.css and so land
+   under public/music, which is exactly where corvo.css is not. It is served off
+   the classpath by the /corvo route in et.mu.server. */
+@import url('/corvo/css/corvo.css?v=__CACHE_BUST__');
 /* last, so its narrow-screen rules win */
 @import url('css/mobile.css?v=__CACHE_BUST__');
